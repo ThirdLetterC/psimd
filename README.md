@@ -1,6 +1,6 @@
 ### psimd
 
-A portable, header-only SIMD library for C. A single include, no dependencies beyond the C standard library and the platform's intrinsic headers. Provides a stable, ISA-agnostic API that maps to native vector instructions on x86 (SSE2, SSE4.1, AVX/AVX2+FMA), ARM (NEON/AArch64) and WebAssembly SIMD128, with a scalar fallback for everything else.
+A portable, header-only SIMD library for C23. A single include, no dependencies beyond the C standard library and the platform's intrinsic headers. Provides a stable, ISA-agnostic API that maps to native vector instructions on x86 (SSE2, SSE4.1, AVX/AVX2+FMA), ARM (NEON/AArch64) and WebAssembly SIMD128, with a scalar fallback for everything else.
 
 ### Features
 
@@ -14,21 +14,22 @@ A portable, header-only SIMD library for C. A single include, no dependencies be
 Include the [`psimd.h`](/psimd.h) header.
 
 The backend is chosen by passing the appropriate architecture flag to the compiler. No source changes required.
+Use `-std=c2x` with compilers that implement C23 features but have not yet accepted `-std=c23`.
 
 #### x86
 
 ```sh
 # Force scalar fallback
-gcc -O2 -DPSIMD_FORCE_SCALAR -std=c99 your_file.c -lm
+gcc -O2 -DPSIMD_FORCE_SCALAR -std=c23 your_file.c -lm
 
 # SSE2
-gcc -O2 -msse2 -std=c99 your_file.c -lm
+gcc -O2 -msse2 -std=c23 your_file.c -lm
 
 # SSE4.1 (adds blendv, floor/ceil/round, faster integer min/max/mul)
-gcc -O2 -msse4.1 -std=c99 your_file.c -lm
+gcc -O2 -msse4.1 -std=c23 your_file.c -lm
 
 # AVX + FMA (256-bit f32x8, native FMA, full AVX2 integer ops)
-gcc -O2 -mavx2 -mfma -std=c99 your_file.c -lm
+gcc -O2 -mavx2 -mfma -std=c23 your_file.c -lm
 ```
 
 Clang accepts the same flags. MSVC users would pass `/arch:AVX2` for the AVX backend.
@@ -37,10 +38,10 @@ Clang accepts the same flags. MSVC users would pass `/arch:AVX2` for the AVX bac
 
 ```sh
 # ARMv7 NEON (cross-compile)
-arm-linux-gnueabihf-gcc -O2 -mfpu=neon -std=c99 your_file.c -lm
+arm-linux-gnueabihf-gcc -O2 -mfpu=neon -std=c23 your_file.c -lm
 
 # AArch64 (NEON is always present, no flag needed)
-aarch64-linux-gnu-gcc -O2 -std=c99 your_file.c -lm
+aarch64-linux-gnu-gcc -O2 -std=c23 your_file.c -lm
 ```
 
 On Apple Silicon with Clang, NEON is detected automatically, no extra flags needed.
@@ -48,7 +49,7 @@ On Apple Silicon with Clang, NEON is detected automatically, no extra flags need
 #### WebAssembly
 
 ```sh
-emcc -O2 -msimd128 -std=c99 your_file.c -lm -o output.js
+emcc -O2 -msimd128 -std=c23 your_file.c -lm -o output.js
 ```
 
 #### Checking which backend is active
@@ -67,13 +68,13 @@ psimd_backend b = psimd_get_backend();
 
 ```sh
 # Scalar
-gcc -O2 -DPSIMD_FORCE_SCALAR -std=c99 test.c -lm -o test && ./test
+gcc -O2 -DPSIMD_FORCE_SCALAR -std=c23 -Wall -Wextra -Wpedantic -Werror test.c -lm -o test && ./test
 
 # SSE4.1
-gcc -O2 -msse4.1 -std=c99 test.c -lm -o test && ./test
+gcc -O2 -msse4.1 -std=c23 -Wall -Wextra -Wpedantic -Werror test.c -lm -o test && ./test
 
 # AVX2 + FMA
-gcc -O2 -mavx2 -mfma -std=c99 test.c -lm -o test && ./test
+gcc -O2 -mavx2 -mfma -std=c23 -Wall -Wextra -Wpedantic -Werror test.c -lm -o test && ./test
 ```
 
 The suite runs 114 checks covering construction, arithmetic, comparisons, masks, select, reductions, type conversions, shuffles and several practical kernels.
@@ -106,7 +107,7 @@ The suite runs 114 checks covering construction, arithmetic, comparisons, masks,
 ```c
 psimd_f32x4 psimd_set1_f32x4(float x);
 psimd_f32x4 psimd_set_f32x4(float x0, float x1, float x2, float x3);
-psimd_f32x4 psimd_zero_f32x4(void);
+psimd_f32x4 psimd_zero_f32x4();
 psimd_f32x4 psimd_loadu_f32x4(const float *p);   // unaligned load
 psimd_f32x4 psimd_loada_f32x4(const float *p);   // 16-byte aligned load
 void        psimd_storeu_f32x4(float *p, psimd_f32x4 v);
@@ -188,10 +189,10 @@ psimd_mask32x4 psimd_and_mask32x4(psimd_mask32x4 a, psimd_mask32x4 b);
 psimd_mask32x4 psimd_or_mask32x4(psimd_mask32x4 a, psimd_mask32x4 b);
 psimd_mask32x4 psimd_xor_mask32x4(psimd_mask32x4 a, psimd_mask32x4 b);
 psimd_mask32x4 psimd_not_mask32x4(psimd_mask32x4 a);
-int            psimd_any_mask32x4(psimd_mask32x4 m);
-int            psimd_all_mask32x4(psimd_mask32x4 m);
-psimd_mask32x4 psimd_true_mask32x4(void);
-psimd_mask32x4 psimd_false_mask32x4(void);
+bool           psimd_any_mask32x4(psimd_mask32x4 m);
+bool           psimd_all_mask32x4(psimd_mask32x4 m);
+psimd_mask32x4 psimd_true_mask32x4();
+psimd_mask32x4 psimd_false_mask32x4();
 ```
 
 #### i32x4
@@ -199,7 +200,7 @@ psimd_mask32x4 psimd_false_mask32x4(void);
 ```c
 psimd_i32x4 psimd_set1_i32x4(int32_t x);
 psimd_i32x4 psimd_set_i32x4(int32_t x0, int32_t x1, int32_t x2, int32_t x3);
-psimd_i32x4 psimd_zero_i32x4(void);
+psimd_i32x4 psimd_zero_i32x4();
 psimd_i32x4 psimd_loadu_i32x4(const int32_t *p);
 psimd_i32x4 psimd_loada_i32x4(const int32_t *p);
 void        psimd_storeu_i32x4(int32_t *p, psimd_i32x4 v);

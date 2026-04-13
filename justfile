@@ -1,8 +1,10 @@
 set shell := ["sh", "-cu"]
 
 cc := env_var_or_default("CC", "gcc")
-cflags := env_var_or_default("CFLAGS", "-O2 -std=c99 -Wall -Wextra -pedantic")
+cflags := env_var_or_default("CFLAGS", "-O2 -std=c2x -Wall -Wextra -Wpedantic -Werror")
+sanitize_cflags := env_var_or_default("SANITIZE_CFLAGS", "-O1 -g -std=c2x -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined,leak -fno-omit-frame-pointer")
 ldflags := env_var_or_default("LDFLAGS", "-lm")
+sanitize_ldflags := env_var_or_default("SANITIZE_LDFLAGS", "-lm -fsanitize=address,undefined,leak")
 build_dir := "build"
 sources := "psimd.h test.c"
 
@@ -24,6 +26,15 @@ build-scalar:
 # Run the scalar test binary.
 test-scalar: build-scalar
   ./{{build_dir}}/test-scalar
+
+# Compile the scalar test binary with sanitizers.
+build-sanitize:
+  mkdir -p {{build_dir}}
+  {{cc}} {{sanitize_cflags}} -DPSIMD_FORCE_SCALAR test.c {{sanitize_ldflags}} -o {{build_dir}}/test-sanitize
+
+# Run the scalar sanitizer test binary.
+test-sanitize: build-sanitize
+  ./{{build_dir}}/test-sanitize
 
 # Compile the SSE4.1 test binary.
 build-sse41:

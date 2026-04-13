@@ -101,21 +101,22 @@ An attacker may influence:
   prefetch as a validation or bounds mechanism.
 - The library is reentrant because it has no mutable internal state. Thread
   safety of buffers passed to `psimd` remains the caller's responsibility.
-- The current repository is C99-oriented in its examples and `justfile` defaults.
-  Downstream C23 users should compile their own code with their normal C23 and
-  warning policy while verifying compiler support for the intrinsic headers they
-  target.
+- The current repository is C23-oriented in its examples and `justfile`
+  defaults. Downstream users should compile their own code with the same warning
+  policy while verifying compiler support for the intrinsic headers they target.
 
 ## Build Hardening
 
 - Current local defaults are defined in `justfile`:
-  `-O2 -std=c99 -Wall -Wextra -pedantic`.
+  `-O2 -std=c2x -Wall -Wextra -Wpedantic -Werror`.
 - `just test` runs `test-all`, which builds and runs scalar, SSE4.1, and
   AVX2+FMA tests when supported by the host CPU.
 - `just test-scalar` compiles with `-DPSIMD_FORCE_SCALAR`.
 - `just test-sse41` compiles with `-msse4.1`.
 - `just test-avx2` compiles with `-mavx2 -mfma`.
 - `just format-check` checks `psimd.h` and `test.c` with `clang-format`.
+- `just test-sanitize` runs the scalar test binary under AddressSanitizer,
+  UndefinedBehaviorSanitizer, and LeakSanitizer.
 - Security-sensitive downstream builds should add sanitizers and hardening flags
   appropriate for their platform, such as:
 

@@ -1,12 +1,15 @@
 #include "psimd.h"
 
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include <math.h>
 
-static int g_passed = 0;
-static int g_failed = 0;
+static int g_passed;
+static int g_failed;
+
+static constexpr float f32_epsilon = 1e-5f;
+static constexpr uint32_t mask32_true_bits = UINT32_MAX;
 
 #define CHECK(cond, name)                                                      \
   do {                                                                         \
@@ -19,7 +22,7 @@ static int g_failed = 0;
     }                                                                          \
   } while (0)
 
-#define CHECKF(a, b, name) CHECK(fabsf((a) - (b)) < 1e-5f, name)
+#define CHECKF(a, b, name) CHECK(fabsf((a) - (b)) < f32_epsilon, name)
 
 static const char* backend_name(psimd_backend b) {
   switch (b) {
@@ -42,37 +45,38 @@ static const char* backend_name(psimd_backend b) {
 
 /* ---- helpers ---- */
 
-static int f32x4_eq(psimd_f32x4 v, float x0, float x1, float x2, float x3) {
+static bool f32x4_eq(psimd_f32x4 v, float x0, float x1, float x2, float x3) {
   float out[4];
   psimd_storeu_f32x4(out, v);
-  return fabsf(out[0] - x0) < 1e-5f && fabsf(out[1] - x1) < 1e-5f &&
-         fabsf(out[2] - x2) < 1e-5f && fabsf(out[3] - x3) < 1e-5f;
+  return fabsf(out[0] - x0) < f32_epsilon && fabsf(out[1] - x1) < f32_epsilon &&
+         fabsf(out[2] - x2) < f32_epsilon && fabsf(out[3] - x3) < f32_epsilon;
 }
 
-static int f32x8_eq(psimd_f32x8 v, float x0, float x1, float x2, float x3,
-                    float x4, float x5, float x6, float x7) {
+static bool f32x8_eq(psimd_f32x8 v, float x0, float x1, float x2, float x3,
+                     float x4, float x5, float x6, float x7) {
   float out[8];
   psimd_storeu_f32x8(out, v);
-  return fabsf(out[0] - x0) < 1e-5f && fabsf(out[1] - x1) < 1e-5f &&
-         fabsf(out[2] - x2) < 1e-5f && fabsf(out[3] - x3) < 1e-5f &&
-         fabsf(out[4] - x4) < 1e-5f && fabsf(out[5] - x5) < 1e-5f &&
-         fabsf(out[6] - x6) < 1e-5f && fabsf(out[7] - x7) < 1e-5f;
+  return fabsf(out[0] - x0) < f32_epsilon && fabsf(out[1] - x1) < f32_epsilon &&
+         fabsf(out[2] - x2) < f32_epsilon && fabsf(out[3] - x3) < f32_epsilon &&
+         fabsf(out[4] - x4) < f32_epsilon && fabsf(out[5] - x5) < f32_epsilon &&
+         fabsf(out[6] - x6) < f32_epsilon && fabsf(out[7] - x7) < f32_epsilon;
 }
 
-static int i32x4_eq(psimd_i32x4 v, int32_t x0, int32_t x1, int32_t x2,
-                    int32_t x3) {
+static bool i32x4_eq(psimd_i32x4 v, int32_t x0, int32_t x1, int32_t x2,
+                     int32_t x3) {
   int32_t out[4];
   psimd_storeu_i32x4(out, v);
   return out[0] == x0 && out[1] == x1 && out[2] == x2 && out[3] == x3;
 }
 
-static int mask32x4_lanes(psimd_mask32x4 m, int l0, int l1, int l2, int l3) {
+static bool mask32x4_lanes(psimd_mask32x4 m, bool l0, bool l1, bool l2,
+                           bool l3) {
   uint32_t out[4];
   memcpy(out, m._, 16);
-  int b0 = out[0] == 0xffffffff ? 1 : 0;
-  int b1 = out[1] == 0xffffffff ? 1 : 0;
-  int b2 = out[2] == 0xffffffff ? 1 : 0;
-  int b3 = out[3] == 0xffffffff ? 1 : 0;
+  auto b0 = out[0] == mask32_true_bits;
+  auto b1 = out[1] == mask32_true_bits;
+  auto b2 = out[2] == mask32_true_bits;
+  auto b3 = out[3] == mask32_true_bits;
   return b0 == l0 && b1 == l1 && b2 == l2 && b3 == l3;
 }
 
@@ -80,7 +84,7 @@ static int mask32x4_lanes(psimd_mask32x4 m, int l0, int l1, int l2, int l3) {
    f32x4 construction
    ================================================================ */
 
-static void test_f32x4_construction(void) {
+static void test_f32x4_construction() {
   printf("\nf32x4 construction\n");
 
   psimd_f32x4 a = psimd_set1_f32x4(3.14f);
@@ -122,7 +126,7 @@ static void test_f32x4_construction(void) {
    f32x4 arithmetic
    ================================================================ */
 
-static void test_f32x4_arithmetic(void) {
+static void test_f32x4_arithmetic() {
   printf("\nf32x4 arithmetic\n");
 
   psimd_f32x4 a = psimd_set_f32x4(1.0f, 2.0f, 3.0f, 4.0f);
@@ -150,7 +154,7 @@ static void test_f32x4_arithmetic(void) {
    f32x4 FMA
    ================================================================ */
 
-static void test_f32x4_fma(void) {
+static void test_f32x4_fma() {
   printf("\nf32x4 fma\n");
 
   psimd_f32x4 a = psimd_set1_f32x4(2.0f);
@@ -167,7 +171,7 @@ static void test_f32x4_fma(void) {
    f32x4 min / max
    ================================================================ */
 
-static void test_f32x4_minmax(void) {
+static void test_f32x4_minmax() {
   printf("\nf32x4 min/max\n");
 
   psimd_f32x4 a = psimd_set_f32x4(1.0f, 5.0f, 2.0f, 8.0f);
@@ -181,25 +185,31 @@ static void test_f32x4_minmax(void) {
    f32x4 comparisons
    ================================================================ */
 
-static void test_f32x4_comparisons(void) {
+static void test_f32x4_comparisons() {
   printf("\nf32x4 comparisons\n");
 
   psimd_f32x4 a = psimd_set_f32x4(1.0f, 2.0f, 3.0f, 4.0f);
   psimd_f32x4 b = psimd_set_f32x4(2.0f, 2.0f, 2.0f, 2.0f);
 
-  CHECK(mask32x4_lanes(psimd_cmpeq_f32x4(a, b), 0, 1, 0, 0), "cmpeq");
-  CHECK(mask32x4_lanes(psimd_cmpne_f32x4(a, b), 1, 0, 1, 1), "cmpne");
-  CHECK(mask32x4_lanes(psimd_cmplt_f32x4(a, b), 1, 0, 0, 0), "cmplt");
-  CHECK(mask32x4_lanes(psimd_cmple_f32x4(a, b), 1, 1, 0, 0), "cmple");
-  CHECK(mask32x4_lanes(psimd_cmpgt_f32x4(a, b), 0, 0, 1, 1), "cmpgt");
-  CHECK(mask32x4_lanes(psimd_cmpge_f32x4(a, b), 0, 1, 1, 1), "cmpge");
+  CHECK(mask32x4_lanes(psimd_cmpeq_f32x4(a, b), false, true, false, false),
+        "cmpeq");
+  CHECK(mask32x4_lanes(psimd_cmpne_f32x4(a, b), true, false, true, true),
+        "cmpne");
+  CHECK(mask32x4_lanes(psimd_cmplt_f32x4(a, b), true, false, false, false),
+        "cmplt");
+  CHECK(mask32x4_lanes(psimd_cmple_f32x4(a, b), true, true, false, false),
+        "cmple");
+  CHECK(mask32x4_lanes(psimd_cmpgt_f32x4(a, b), false, false, true, true),
+        "cmpgt");
+  CHECK(mask32x4_lanes(psimd_cmpge_f32x4(a, b), false, true, true, true),
+        "cmpge");
 }
 
 /* ================================================================
    f32x4 select
    ================================================================ */
 
-static void test_f32x4_select(void) {
+static void test_f32x4_select() {
   printf("\nf32x4 select\n");
 
   psimd_f32x4 a = psimd_set_f32x4(1.0f, 2.0f, 3.0f, 4.0f);
@@ -222,7 +232,7 @@ static void test_f32x4_select(void) {
    f32x4 reductions
    ================================================================ */
 
-static void test_f32x4_reductions(void) {
+static void test_f32x4_reductions() {
   printf("\nf32x4 reductions\n");
 
   psimd_f32x4 v = psimd_set_f32x4(1.0f, 2.0f, 3.0f, 4.0f);
@@ -242,7 +252,7 @@ static void test_f32x4_reductions(void) {
    f32x4 math ops
    ================================================================ */
 
-static void test_f32x4_math(void) {
+static void test_f32x4_math() {
   printf("\nf32x4 math\n");
 
   psimd_f32x4 v = psimd_set_f32x4(-1.7f, 1.2f, 2.9f, -0.1f);
@@ -268,7 +278,7 @@ static void test_f32x4_math(void) {
    f32x4 shuffle / zip
    ================================================================ */
 
-static void test_f32x4_shuffle(void) {
+static void test_f32x4_shuffle() {
   printf("\nf32x4 shuffle / zip\n");
 
   psimd_f32x4 a = psimd_set_f32x4(1.0f, 2.0f, 3.0f, 4.0f);
@@ -282,7 +292,7 @@ static void test_f32x4_shuffle(void) {
    mask32x4 logical operations
    ================================================================ */
 
-static void test_mask32x4_ops(void) {
+static void test_mask32x4_ops() {
   printf("\nmask32x4 logical\n");
 
   psimd_f32x4 a = psimd_set_f32x4(1.0f, 2.0f, 3.0f, 4.0f);
@@ -297,17 +307,21 @@ static void test_mask32x4_ops(void) {
   CHECK(psimd_all_mask32x4(all), "all (true)");
   CHECK(!psimd_all_mask32x4(lo), "all (false)");
 
-  CHECK(mask32x4_lanes(psimd_and_mask32x4(lo, hi), 0, 0, 0, 0), "and");
-  CHECK(mask32x4_lanes(psimd_or_mask32x4(lo, hi), 1, 1, 1, 1), "or");
-  CHECK(mask32x4_lanes(psimd_xor_mask32x4(lo, lo), 0, 0, 0, 0), "xor self");
-  CHECK(mask32x4_lanes(psimd_not_mask32x4(lo), 0, 0, 1, 1), "not");
+  CHECK(mask32x4_lanes(psimd_and_mask32x4(lo, hi), false, false, false, false),
+        "and");
+  CHECK(mask32x4_lanes(psimd_or_mask32x4(lo, hi), true, true, true, true),
+        "or");
+  CHECK(mask32x4_lanes(psimd_xor_mask32x4(lo, lo), false, false, false, false),
+        "xor self");
+  CHECK(mask32x4_lanes(psimd_not_mask32x4(lo), false, false, true, true),
+        "not");
 }
 
 /* ================================================================
    i32x4 construction
    ================================================================ */
 
-static void test_i32x4_construction(void) {
+static void test_i32x4_construction() {
   printf("\ni32x4 construction\n");
 
   CHECK(i32x4_eq(psimd_set1_i32x4(7), 7, 7, 7, 7), "set1");
@@ -326,7 +340,7 @@ static void test_i32x4_construction(void) {
    i32x4 arithmetic
    ================================================================ */
 
-static void test_i32x4_arithmetic(void) {
+static void test_i32x4_arithmetic() {
   printf("\ni32x4 arithmetic\n");
 
   psimd_i32x4 a = psimd_set_i32x4(10, 20, 30, 40);
@@ -365,7 +379,7 @@ static void test_i32x4_arithmetic(void) {
    i32x4 bitwise and shifts
    ================================================================ */
 
-static void test_i32x4_bitwise(void) {
+static void test_i32x4_bitwise() {
   printf("\ni32x4 bitwise / shift\n");
 
   psimd_i32x4 a = psimd_set1_i32x4(0x0f0f0f0f);
@@ -398,15 +412,18 @@ static void test_i32x4_bitwise(void) {
    i32x4 comparisons and select
    ================================================================ */
 
-static void test_i32x4_comparisons(void) {
+static void test_i32x4_comparisons() {
   printf("\ni32x4 comparisons / select\n");
 
   psimd_i32x4 a = psimd_set_i32x4(1, 2, 3, 4);
   psimd_i32x4 b = psimd_set1_i32x4(2);
 
-  CHECK(mask32x4_lanes(psimd_cmpeq_i32x4(a, b), 0, 1, 0, 0), "cmpeq");
-  CHECK(mask32x4_lanes(psimd_cmplt_i32x4(a, b), 1, 0, 0, 0), "cmplt");
-  CHECK(mask32x4_lanes(psimd_cmpgt_i32x4(a, b), 0, 0, 1, 1), "cmpgt");
+  CHECK(mask32x4_lanes(psimd_cmpeq_i32x4(a, b), false, true, false, false),
+        "cmpeq");
+  CHECK(mask32x4_lanes(psimd_cmplt_i32x4(a, b), true, false, false, false),
+        "cmplt");
+  CHECK(mask32x4_lanes(psimd_cmpgt_i32x4(a, b), false, false, true, true),
+        "cmpgt");
 
   psimd_mask32x4 m = psimd_cmpgt_i32x4(a, b);
   psimd_i32x4 r = psimd_select_i32x4(m, a, psimd_set1_i32x4(0));
@@ -417,7 +434,7 @@ static void test_i32x4_comparisons(void) {
    i32x4 reductions
    ================================================================ */
 
-static void test_i32x4_reductions(void) {
+static void test_i32x4_reductions() {
   printf("\ni32x4 reductions\n");
 
   psimd_i32x4 v = psimd_set_i32x4(1, 2, 3, 4);
@@ -433,7 +450,7 @@ static void test_i32x4_reductions(void) {
    type conversions
    ================================================================ */
 
-static void test_conversions(void) {
+static void test_conversions() {
   printf("\ntype conversions\n");
 
   psimd_f32x4 f = psimd_set_f32x4(1.9f, 2.1f, -3.7f, 4.0f);
@@ -463,7 +480,7 @@ static void test_conversions(void) {
    f32x8
    ================================================================ */
 
-static void test_f32x8(void) {
+static void test_f32x8() {
   printf("\nf32x8\n");
 
   float a[8] = {1, 2, 3, 4, 5, 6, 7, 8};
@@ -474,14 +491,16 @@ static void test_f32x8(void) {
   psimd_f32x8 vb = psimd_loadu_f32x8(b);
 
   psimd_storeu_f32x8(out, psimd_add_f32x8(va, vb));
-  int add_ok = 1;
+  bool add_ok = true;
   for (int i = 0; i < 8; i++)
-    if (fabsf(out[i] - 9.0f) > 1e-5f)
-      add_ok = 0;
+    if (fabsf(out[i] - 9.0f) > f32_epsilon)
+      add_ok = false;
   CHECK(add_ok, "add");
 
   psimd_storeu_f32x8(out, psimd_mul_f32x8(va, vb));
-  CHECK(fabsf(out[0] - 8.0f) < 1e-5f && fabsf(out[7] - 8.0f) < 1e-5f, "mul");
+  CHECK(fabsf(out[0] - 8.0f) < f32_epsilon &&
+            fabsf(out[7] - 8.0f) < f32_epsilon,
+        "mul");
 
   CHECK(f32x8_eq(psimd_min_f32x8(va, vb), 1, 2, 3, 4, 4, 3, 2, 1), "min");
   CHECK(f32x8_eq(psimd_max_f32x8(va, vb), 8, 7, 6, 5, 5, 6, 7, 8), "max");
@@ -504,7 +523,7 @@ static void test_f32x8(void) {
    i32x8
    ================================================================ */
 
-static void test_i32x8(void) {
+static void test_i32x8() {
   printf("\ni32x8\n");
 
   psimd_i32x8 a = psimd_set1_i32x8(3);
@@ -529,7 +548,7 @@ static void test_i32x8(void) {
    u32x4
    ================================================================ */
 
-static void test_u32x4(void) {
+static void test_u32x4() {
   printf("\nu32x4\n");
 
   psimd_u32x4 a = psimd_set1_u32x4(0xdeadbeef);
@@ -551,35 +570,36 @@ static void test_u32x4(void) {
 
   psimd_u32x4 eq1 = psimd_set1_u32x4(42u);
   psimd_u32x4 eq2 = psimd_set_u32x4(42u, 0u, 42u, 1u);
-  CHECK(mask32x4_lanes(psimd_cmpeq_u32x4(eq1, eq2), 1, 0, 1, 0), "cmpeq");
+  CHECK(mask32x4_lanes(psimd_cmpeq_u32x4(eq1, eq2), true, false, true, false),
+        "cmpeq");
 }
 
 /* ================================================================
    kernel: array elementwise ops
    ================================================================ */
 
-static void test_kernel_array_ops(void) {
+static void test_kernel_array_ops() {
   printf("\nkernel: array ops\n");
 
-#define N 16
-  float PSIMD_ALIGN(16) a[N], b[N], out[N];
-  for (int i = 0; i < N; i++) {
+  constexpr int n = 16;
+  float PSIMD_ALIGN(16) a[n], b[n], out[n];
+  for (int i = 0; i < n; i++) {
     a[i] = (float)(i + 1);
-    b[i] = (float)(N - i);
+    b[i] = (float)(n - i);
   }
 
-  for (int i = 0; i < N; i += 4) {
+  for (int i = 0; i < n; i += 4) {
     psimd_f32x4 va = psimd_loada_f32x4(a + i);
     psimd_f32x4 vb = psimd_loada_f32x4(b + i);
     psimd_storea_f32x4(out + i, psimd_add_f32x4(va, vb));
   }
-  int ok = 1;
-  for (int i = 0; i < N; i++)
-    if (fabsf(out[i] - (float)(N + 1)) > 1e-5f)
-      ok = 0;
+  bool ok = true;
+  for (int i = 0; i < n; i++)
+    if (fabsf(out[i] - (float)(n + 1)) > f32_epsilon)
+      ok = false;
   CHECK(ok, "elementwise add (aligned stride-4)");
 
-  for (int i = 0; i < N; i += 4) {
+  for (int i = 0; i < n; i += 4) {
     psimd_f32x4 va = psimd_loada_f32x4(a + i);
     psimd_f32x4 vb = psimd_loada_f32x4(b + i);
     psimd_f32x4 res = psimd_fma_f32x4(va, vb, psimd_set1_f32x4(1.0f));
@@ -587,103 +607,99 @@ static void test_kernel_array_ops(void) {
   }
   float expected0 = a[0] * b[0] + 1.0f;
   CHECKF(out[0], expected0, "FMA kernel lane 0");
-#undef N
 }
 
 /* ================================================================
    kernel: relu
    ================================================================ */
 
-static void test_kernel_relu(void) {
+static void test_kernel_relu() {
   printf("\nkernel: relu\n");
 
-#define N 8
-  float in[N] = {-3.0f, 1.0f, -0.5f, 2.0f, 0.0f, -1.0f, 4.0f, -2.0f};
-  float out[N] = {0};
+  constexpr int n = 8;
+  float in[n] = {-3.0f, 1.0f, -0.5f, 2.0f, 0.0f, -1.0f, 4.0f, -2.0f};
+  float out[n] = {0};
   psimd_f32x4 zero = psimd_zero_f32x4();
 
-  for (int i = 0; i < N; i += 4) {
+  for (int i = 0; i < n; i += 4) {
     psimd_f32x4 v = psimd_loadu_f32x4(in + i);
     psimd_storeu_f32x4(out + i, psimd_max_f32x4(v, zero));
   }
 
-  float expected[N] = {0, 1.0f, 0, 2.0f, 0, 0, 4.0f, 0};
-  int ok = 1;
-  for (int i = 0; i < N; i++)
-    if (fabsf(out[i] - expected[i]) > 1e-5f)
-      ok = 0;
+  float expected[n] = {0, 1.0f, 0, 2.0f, 0, 0, 4.0f, 0};
+  bool ok = true;
+  for (int i = 0; i < n; i++)
+    if (fabsf(out[i] - expected[i]) > f32_epsilon)
+      ok = false;
   CHECK(ok, "relu (max with zero)");
-#undef N
 }
 
 /* ================================================================
    kernel: clamp
    ================================================================ */
 
-static void test_kernel_clamp(void) {
+static void test_kernel_clamp() {
   printf("\nkernel: clamp\n");
 
-#define N 8
-  float in[N] = {-5.0f, 0.5f, 1.5f, 3.0f, -1.0f, 0.0f, 2.5f, 10.0f};
-  float out[N] = {0};
+  constexpr int n = 8;
+  float in[n] = {-5.0f, 0.5f, 1.5f, 3.0f, -1.0f, 0.0f, 2.5f, 10.0f};
+  float out[n] = {0};
   psimd_f32x4 lo = psimd_set1_f32x4(0.0f);
   psimd_f32x4 hi = psimd_set1_f32x4(2.0f);
 
-  for (int i = 0; i < N; i += 4) {
+  for (int i = 0; i < n; i += 4) {
     psimd_f32x4 v = psimd_loadu_f32x4(in + i);
     psimd_storeu_f32x4(out + i, psimd_min_f32x4(psimd_max_f32x4(v, lo), hi));
   }
 
-  float expected[N] = {0.0f, 0.5f, 1.5f, 2.0f, 0.0f, 0.0f, 2.0f, 2.0f};
-  int ok = 1;
-  for (int i = 0; i < N; i++)
-    if (fabsf(out[i] - expected[i]) > 1e-5f)
-      ok = 0;
+  float expected[n] = {0.0f, 0.5f, 1.5f, 2.0f, 0.0f, 0.0f, 2.0f, 2.0f};
+  bool ok = true;
+  for (int i = 0; i < n; i++)
+    if (fabsf(out[i] - expected[i]) > f32_epsilon)
+      ok = false;
   CHECK(ok, "clamp [0, 2]");
-#undef N
 }
 
 /* ================================================================
    kernel: dot product
    ================================================================ */
 
-static void test_kernel_dot(void) {
+static void test_kernel_dot() {
   printf("\nkernel: dot product\n");
 
-#define N 16
-  float a[N], b[N];
+  constexpr int n = 16;
+  float a[n], b[n];
   float expected = 0.0f;
-  for (int i = 0; i < N; i++) {
+  for (int i = 0; i < n; i++) {
     a[i] = (float)(i + 1);
     b[i] = (float)(i + 1);
     expected += a[i] * b[i];
   }
 
   psimd_f32x4 acc = psimd_zero_f32x4();
-  for (int i = 0; i < N; i += 4) {
+  for (int i = 0; i < n; i += 4) {
     acc = psimd_fma_f32x4(psimd_loadu_f32x4(a + i), psimd_loadu_f32x4(b + i),
                           acc);
   }
   float result = psimd_reduce_add_f32x4(acc);
   CHECKF(result, expected, "dot product via FMA+reduce");
-#undef N
 }
 
 /* ================================================================
    kernel: conditional blend
    ================================================================ */
 
-static void test_kernel_blend(void) {
+static void test_kernel_blend() {
   printf("\nkernel: conditional blend\n");
 
-#define N 8
-  float src[N] = {1.0f, -1.0f, 2.0f, -2.0f, 3.0f, -3.0f, 4.0f, -4.0f};
-  float sign[N] = {0};
+  constexpr int n = 8;
+  float src[n] = {1.0f, -1.0f, 2.0f, -2.0f, 3.0f, -3.0f, 4.0f, -4.0f};
+  float sign[n] = {0};
   psimd_f32x4 zero = psimd_zero_f32x4();
   psimd_f32x4 pos = psimd_set1_f32x4(1.0f);
   psimd_f32x4 neg = psimd_set1_f32x4(-1.0f);
 
-  for (int i = 0; i < N; i += 4) {
+  for (int i = 0; i < n; i += 4) {
     psimd_f32x4 v = psimd_loadu_f32x4(src + i);
     psimd_mask32x4 gtz = psimd_cmpgt_f32x4(v, zero);
     psimd_mask32x4 ltz = psimd_cmplt_f32x4(v, zero);
@@ -692,20 +708,19 @@ static void test_kernel_blend(void) {
     psimd_storeu_f32x4(sign + i, r);
   }
 
-  float expected[N] = {1, -1, 1, -1, 1, -1, 1, -1};
-  int ok = 1;
-  for (int i = 0; i < N; i++)
-    if (fabsf(sign[i] - expected[i]) > 1e-5f)
-      ok = 0;
+  float expected[n] = {1, -1, 1, -1, 1, -1, 1, -1};
+  bool ok = true;
+  for (int i = 0; i < n; i++)
+    if (fabsf(sign[i] - expected[i]) > f32_epsilon)
+      ok = false;
   CHECK(ok, "sign extraction via nested select");
-#undef N
 }
 
 /* ================================================================
    main
    ================================================================ */
 
-int main(void) {
+int main() {
   printf("psimd test suite\n");
   printf("backend: %s\n", backend_name(psimd_get_backend()));
 
@@ -735,5 +750,5 @@ int main(void) {
   test_kernel_blend();
 
   printf("\n%d passed, %d failed\n", g_passed, g_failed);
-  return g_failed > 0 ? 1 : 0;
+  return g_failed > 0;
 }

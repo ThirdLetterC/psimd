@@ -55,9 +55,11 @@
 #define PSIMD_SCALAR 1
 #endif
 
-#define PSIMD_VERSION_MAJOR 1
-#define PSIMD_VERSION_MINOR 0
-#define PSIMD_VERSION_PATCH 0
+static constexpr int PSIMD_VERSION_MAJOR = 1;
+static constexpr int PSIMD_VERSION_MINOR = 0;
+static constexpr int PSIMD_VERSION_PATCH = 0;
+
+static constexpr uint32_t psimd__mask32_true_bits = UINT32_MAX;
 
 #if defined(_MSC_VER)
 #define PSIMD_INLINE __forceinline
@@ -66,6 +68,8 @@
 #else
 #define PSIMD_INLINE static inline
 #endif
+
+#define PSIMD_NODISCARD [[nodiscard]]
 
 #if defined(__GNUC__) || defined(__clang__)
 #define PSIMD_ALIGN(n) __attribute__((aligned(n)))
@@ -284,7 +288,7 @@ PSIMD_INLINE psimd_f32x4 psimd_set_f32x4(float x0, float x1, float x2,
 #endif
 }
 
-PSIMD_INLINE psimd_f32x4 psimd_zero_f32x4(void) {
+PSIMD_NODISCARD PSIMD_INLINE psimd_f32x4 psimd_zero_f32x4() {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_setzero_ps());
 #elif defined(PSIMD_NEON)
@@ -775,10 +779,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] == pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] == pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] == pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] == pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] == pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] == pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] == pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] == pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -804,10 +808,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpne_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] != pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] != pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] != pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] != pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] != pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] != pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] != pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] != pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -833,10 +837,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmplt_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] < pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] < pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] < pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] < pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] < pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] < pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] < pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] < pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -862,10 +866,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmple_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] <= pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] <= pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] <= pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] <= pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] <= pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] <= pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] <= pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] <= pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -891,10 +895,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpgt_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] > pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] > pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] > pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] > pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] > pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] > pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] > pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] > pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -920,10 +924,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpge_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] >= pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] >= pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] >= pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] >= pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] >= pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] >= pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] >= pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] >= pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -1193,7 +1197,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_xor_mask32x4(psimd_mask32x4 a,
 #endif
 }
 
-PSIMD_INLINE int psimd_any_mask32x4(psimd_mask32x4 m) {
+PSIMD_NODISCARD PSIMD_INLINE bool psimd_any_mask32x4(psimd_mask32x4 m) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return _mm_movemask_ps(_mm_castsi128_ps(psimd__mask_to_m128i(m))) != 0;
 #elif defined(PSIMD_NEON)
@@ -1206,26 +1210,26 @@ PSIMD_INLINE int psimd_any_mask32x4(psimd_mask32x4 m) {
 #endif
 }
 
-PSIMD_INLINE int psimd_all_mask32x4(psimd_mask32x4 m) {
+PSIMD_NODISCARD PSIMD_INLINE bool psimd_all_mask32x4(psimd_mask32x4 m) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return _mm_movemask_ps(_mm_castsi128_ps(psimd__mask_to_m128i(m))) == 0xf;
 #elif defined(PSIMD_NEON)
   uint32x4_t vm = vld1q_u32((const uint32_t*)m._);
   uint32x2_t r = vand_u32(vget_low_u32(vm), vget_high_u32(vm));
-  return vget_lane_u32(vpmin_u32(r, r), 0) == 0xffffffff;
+  return vget_lane_u32(vpmin_u32(r, r), 0) == psimd__mask32_true_bits;
 #else
   const uint32_t* pm = (const uint32_t*)m._;
-  return (pm[0] & pm[1] & pm[2] & pm[3]) == 0xffffffff;
+  return (pm[0] & pm[1] & pm[2] & pm[3]) == psimd__mask32_true_bits;
 #endif
 }
 
-PSIMD_INLINE psimd_mask32x4 psimd_true_mask32x4(void) {
+PSIMD_NODISCARD PSIMD_INLINE psimd_mask32x4 psimd_true_mask32x4() {
   psimd_mask32x4 r = {{0}};
   memset(r._, 0xff, 16);
   return r;
 }
 
-PSIMD_INLINE psimd_mask32x4 psimd_false_mask32x4(void) {
+PSIMD_NODISCARD PSIMD_INLINE psimd_mask32x4 psimd_false_mask32x4() {
   psimd_mask32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
@@ -1280,7 +1284,7 @@ PSIMD_INLINE psimd_i32x4 psimd_set_i32x4(int32_t x0, int32_t x1, int32_t x2,
 #endif
 }
 
-PSIMD_INLINE psimd_i32x4 psimd_zero_i32x4(void) {
+PSIMD_NODISCARD PSIMD_INLINE psimd_i32x4 psimd_zero_i32x4() {
   psimd_i32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
@@ -1811,10 +1815,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   psimd_mask32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] == pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] == pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] == pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] == pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] == pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] == pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] == pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] == pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -1840,10 +1844,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmplt_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   psimd_mask32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] < pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] < pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] < pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] < pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] < pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] < pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] < pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] < pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -1869,10 +1873,10 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpgt_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   psimd_mask32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
-  pr[0] = pa[0] > pb[0] ? 0xffffffff : 0;
-  pr[1] = pa[1] > pb[1] ? 0xffffffff : 0;
-  pr[2] = pa[2] > pb[2] ? 0xffffffff : 0;
-  pr[3] = pa[3] > pb[3] ? 0xffffffff : 0;
+  pr[0] = pa[0] > pb[0] ? psimd__mask32_true_bits : 0u;
+  pr[1] = pa[1] > pb[1] ? psimd__mask32_true_bits : 0u;
+  pr[2] = pa[2] > pb[2] ? psimd__mask32_true_bits : 0u;
+  pr[3] = pa[3] > pb[3] ? psimd__mask32_true_bits : 0u;
   return r;
 #endif
 }
@@ -2683,23 +2687,19 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_u32x4(psimd_u32x4 a, psimd_u32x4 b) {
    prefetch hints
    ============================================================ */
 
-PSIMD_INLINE void psimd_prefetch_r(const void* p) {
+PSIMD_INLINE void psimd_prefetch_r([[maybe_unused]] const void* p) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   _mm_prefetch((const char*)p, _MM_HINT_T0);
 #elif defined(PSIMD_NEON)
   __builtin_prefetch(p, 0, 3);
-#else
-  (void)p;
 #endif
 }
 
-PSIMD_INLINE void psimd_prefetch_w(const void* p) {
+PSIMD_INLINE void psimd_prefetch_w([[maybe_unused]] const void* p) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   _mm_prefetch((const char*)p, _MM_HINT_T0);
 #elif defined(PSIMD_NEON)
   __builtin_prefetch(p, 1, 3);
-#else
-  (void)p;
 #endif
 }
 
@@ -2716,7 +2716,7 @@ typedef enum {
   psimd_backend_wasm = 5,
 } psimd_backend;
 
-PSIMD_INLINE psimd_backend psimd_get_backend(void) {
+PSIMD_NODISCARD PSIMD_INLINE psimd_backend psimd_get_backend() {
 #if defined(PSIMD_AVX)
   return psimd_backend_avx;
 #elif defined(PSIMD_SSE41)
@@ -2732,15 +2732,15 @@ PSIMD_INLINE psimd_backend psimd_get_backend(void) {
 #endif
 }
 
-PSIMD_INLINE int psimd_f32x4_width(void) {
+PSIMD_NODISCARD PSIMD_INLINE int psimd_f32x4_width() {
   return 4;
 }
 
-PSIMD_INLINE int psimd_f32x8_width(void) {
+PSIMD_NODISCARD PSIMD_INLINE int psimd_f32x8_width() {
   return 8;
 }
 
-PSIMD_INLINE int psimd_i32x4_width(void) {
+PSIMD_NODISCARD PSIMD_INLINE int psimd_i32x4_width() {
   return 4;
 }
 
