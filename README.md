@@ -379,7 +379,7 @@ All operations map directly to `wasm_simd128.h` intrinsics. The target requires 
 To declare an aligned buffer:
 
 ```c
-float PSIMD_ALIGN(16) buf[64];
+alignas(16) float buf[64];
 ```
 
 ### Limitations

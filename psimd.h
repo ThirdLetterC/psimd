@@ -69,16 +69,6 @@ static constexpr uint32_t psimd__mask32_true_bits = UINT32_MAX;
 #define PSIMD_INLINE static inline
 #endif
 
-#define PSIMD_NODISCARD [[nodiscard]]
-
-#if defined(__GNUC__) || defined(__clang__)
-#define PSIMD_ALIGN(n) __attribute__((aligned(n)))
-#elif defined(_MSC_VER)
-#define PSIMD_ALIGN(n) __declspec(align(n))
-#else
-#define PSIMD_ALIGN(n)
-#endif
-
 PSIMD_INLINE int32_t psimd__i32_from_u32(uint32_t x) {
   int32_t r;
   memcpy(&r, &x, sizeof(r));
@@ -100,72 +90,72 @@ PSIMD_INLINE float psimd__round_nearest_even_f32(float x) {
 }
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_f32x4;
+  alignas(16) uint8_t _[16];
+} psimd_f32x4;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_i32x4;
+  alignas(16) uint8_t _[16];
+} psimd_i32x4;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_u32x4;
+  alignas(16) uint8_t _[16];
+} psimd_u32x4;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_mask32x4;
+  alignas(16) uint8_t _[16];
+} psimd_mask32x4;
 
 typedef struct {
-  uint8_t _[32];
-} PSIMD_ALIGN(32) psimd_f32x8;
+  alignas(32) uint8_t _[32];
+} psimd_f32x8;
 
 typedef struct {
-  uint8_t _[32];
-} PSIMD_ALIGN(32) psimd_i32x8;
+  alignas(32) uint8_t _[32];
+} psimd_i32x8;
 
 typedef struct {
-  uint8_t _[32];
-} PSIMD_ALIGN(32) psimd_u32x8;
+  alignas(32) uint8_t _[32];
+} psimd_u32x8;
 
 typedef struct {
-  uint8_t _[32];
-} PSIMD_ALIGN(32) psimd_mask32x8;
+  alignas(32) uint8_t _[32];
+} psimd_mask32x8;
 
 typedef struct {
-  uint8_t _[8];
-} PSIMD_ALIGN(8) psimd_f32x2;
+  alignas(8) uint8_t _[8];
+} psimd_f32x2;
 
 typedef struct {
-  uint8_t _[8];
-} PSIMD_ALIGN(8) psimd_i32x2;
+  alignas(8) uint8_t _[8];
+} psimd_i32x2;
 
 typedef struct {
-  uint8_t _[8];
-} PSIMD_ALIGN(8) psimd_mask32x2;
+  alignas(8) uint8_t _[8];
+} psimd_mask32x2;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_f64x2;
+  alignas(16) uint8_t _[16];
+} psimd_f64x2;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_i64x2;
+  alignas(16) uint8_t _[16];
+} psimd_i64x2;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_i16x8;
+  alignas(16) uint8_t _[16];
+} psimd_i16x8;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_u16x8;
+  alignas(16) uint8_t _[16];
+} psimd_u16x8;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_i8x16;
+  alignas(16) uint8_t _[16];
+} psimd_i8x16;
 
 typedef struct {
-  uint8_t _[16];
-} PSIMD_ALIGN(16) psimd_u8x16;
+  alignas(16) uint8_t _[16];
+} psimd_u8x16;
 
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
 
@@ -288,7 +278,7 @@ PSIMD_INLINE psimd_f32x4 psimd_set_f32x4(float x0, float x1, float x2,
 #endif
 }
 
-PSIMD_NODISCARD PSIMD_INLINE psimd_f32x4 psimd_zero_f32x4() {
+[[nodiscard]] PSIMD_INLINE psimd_f32x4 psimd_zero_f32x4() {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_setzero_ps());
 #elif defined(PSIMD_NEON)
@@ -1197,7 +1187,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_xor_mask32x4(psimd_mask32x4 a,
 #endif
 }
 
-PSIMD_NODISCARD PSIMD_INLINE bool psimd_any_mask32x4(psimd_mask32x4 m) {
+[[nodiscard]] PSIMD_INLINE bool psimd_any_mask32x4(psimd_mask32x4 m) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return _mm_movemask_ps(_mm_castsi128_ps(psimd__mask_to_m128i(m))) != 0;
 #elif defined(PSIMD_NEON)
@@ -1210,7 +1200,7 @@ PSIMD_NODISCARD PSIMD_INLINE bool psimd_any_mask32x4(psimd_mask32x4 m) {
 #endif
 }
 
-PSIMD_NODISCARD PSIMD_INLINE bool psimd_all_mask32x4(psimd_mask32x4 m) {
+[[nodiscard]] PSIMD_INLINE bool psimd_all_mask32x4(psimd_mask32x4 m) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return _mm_movemask_ps(_mm_castsi128_ps(psimd__mask_to_m128i(m))) == 0xf;
 #elif defined(PSIMD_NEON)
@@ -1223,13 +1213,13 @@ PSIMD_NODISCARD PSIMD_INLINE bool psimd_all_mask32x4(psimd_mask32x4 m) {
 #endif
 }
 
-PSIMD_NODISCARD PSIMD_INLINE psimd_mask32x4 psimd_true_mask32x4() {
+[[nodiscard]] PSIMD_INLINE psimd_mask32x4 psimd_true_mask32x4() {
   psimd_mask32x4 r = {{0}};
   memset(r._, 0xff, 16);
   return r;
 }
 
-PSIMD_NODISCARD PSIMD_INLINE psimd_mask32x4 psimd_false_mask32x4() {
+[[nodiscard]] PSIMD_INLINE psimd_mask32x4 psimd_false_mask32x4() {
   psimd_mask32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
@@ -1284,7 +1274,7 @@ PSIMD_INLINE psimd_i32x4 psimd_set_i32x4(int32_t x0, int32_t x1, int32_t x2,
 #endif
 }
 
-PSIMD_NODISCARD PSIMD_INLINE psimd_i32x4 psimd_zero_i32x4() {
+[[nodiscard]] PSIMD_INLINE psimd_i32x4 psimd_zero_i32x4() {
   psimd_i32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
@@ -2716,7 +2706,7 @@ typedef enum {
   psimd_backend_wasm = 5,
 } psimd_backend;
 
-PSIMD_NODISCARD PSIMD_INLINE psimd_backend psimd_get_backend() {
+[[nodiscard]] PSIMD_INLINE psimd_backend psimd_get_backend() {
 #if defined(PSIMD_AVX)
   return psimd_backend_avx;
 #elif defined(PSIMD_SSE41)
@@ -2732,15 +2722,15 @@ PSIMD_NODISCARD PSIMD_INLINE psimd_backend psimd_get_backend() {
 #endif
 }
 
-PSIMD_NODISCARD PSIMD_INLINE int psimd_f32x4_width() {
+[[nodiscard]] PSIMD_INLINE int psimd_f32x4_width() {
   return 4;
 }
 
-PSIMD_NODISCARD PSIMD_INLINE int psimd_f32x8_width() {
+[[nodiscard]] PSIMD_INLINE int psimd_f32x8_width() {
   return 8;
 }
 
-PSIMD_NODISCARD PSIMD_INLINE int psimd_i32x4_width() {
+[[nodiscard]] PSIMD_INLINE int psimd_i32x4_width() {
   return 4;
 }
 
