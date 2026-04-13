@@ -19,7 +19,7 @@ test-all: test-scalar test-sse41 test-avx2-if-supported
 # Compile the scalar test binary.
 build-scalar:
   mkdir -p {{build_dir}}
-  {{cc}} {{cflags}} test.c {{ldflags}} -o {{build_dir}}/test-scalar
+  {{cc}} {{cflags}} -DPSIMD_FORCE_SCALAR test.c {{ldflags}} -o {{build_dir}}/test-scalar
 
 # Run the scalar test binary.
 test-scalar: build-scalar

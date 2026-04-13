@@ -19,9 +19,21 @@
 #include <string.h>
 #include <math.h>
 
-#if defined(__AVX2__) || defined(__AVX__)
+#if defined(PSIMD_FORCE_SCALAR)
+#define PSIMD_SCALAR 1
+#elif defined(__AVX2__) || defined(__AVX__)
 #include <immintrin.h>
 #define PSIMD_AVX 1
+#define PSIMD_SSE2 1
+#if defined(__AVX2__)
+#define PSIMD_AVX2 1
+#endif
+#if defined(__SSE4_1__)
+#define PSIMD_SSE41 1
+#endif
+#if defined(__FMA__)
+#define PSIMD_FMA 1
+#endif
 #elif defined(__SSE2__)
 #include <emmintrin.h>
 #ifdef __SSE4_1__
@@ -62,6 +74,26 @@
 #else
 #define PSIMD_ALIGN(n)
 #endif
+
+PSIMD_INLINE int32_t psimd__i32_from_u32(uint32_t x) {
+  int32_t r;
+  memcpy(&r, &x, sizeof(r));
+  return r;
+}
+
+PSIMD_INLINE float psimd__round_nearest_even_f32(float x) {
+  float lo = floorf(x);
+  float hi = ceilf(x);
+  float dlo = x - lo;
+  float dhi = hi - x;
+  if (dlo < dhi)
+    return lo;
+  if (dhi < dlo)
+    return hi;
+
+  float half = 0.5f * lo;
+  return floorf(half) == half ? lo : hi;
+}
 
 typedef struct {
   uint8_t _[16];
@@ -134,7 +166,7 @@ typedef struct {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
 
 PSIMD_INLINE psimd_f32x4 psimd__from_m128(__m128 v) {
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   _mm_store_ps((float*)r._, v);
   return r;
 }
@@ -144,7 +176,7 @@ PSIMD_INLINE __m128 psimd__to_m128(psimd_f32x4 v) {
 }
 
 PSIMD_INLINE psimd_i32x4 psimd__from_m128i(__m128i v) {
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   _mm_store_si128((__m128i*)r._, v);
   return r;
 }
@@ -158,7 +190,7 @@ PSIMD_INLINE __m128i psimd__to_m128i(psimd_i32x4 v) {
 }
 
 PSIMD_INLINE psimd_mask32x4 psimd__from_m128i_mask(__m128i v) {
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   _mm_store_si128((__m128i*)r._, v);
   return r;
 }
@@ -172,7 +204,7 @@ PSIMD_INLINE __m128i psimd__mask_to_m128i(psimd_mask32x4 v) {
 #if defined(PSIMD_AVX)
 
 PSIMD_INLINE psimd_f32x8 psimd__from_m256(__m256 v) {
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   _mm256_store_ps((float*)r._, v);
   return r;
 }
@@ -182,7 +214,7 @@ PSIMD_INLINE __m256 psimd__to_m256(psimd_f32x8 v) {
 }
 
 PSIMD_INLINE psimd_i32x8 psimd__from_m256i(__m256i v) {
-  psimd_i32x8 r;
+  psimd_i32x8 r = {{0}};
   _mm256_store_si256((__m256i*)r._, v);
   return r;
 }
@@ -192,7 +224,7 @@ PSIMD_INLINE __m256i psimd__to_m256i(psimd_i32x8 v) {
 }
 
 PSIMD_INLINE psimd_mask32x8 psimd__from_m256i_mask(__m256i v) {
-  psimd_mask32x8 r;
+  psimd_mask32x8 r = {{0}};
   _mm256_store_si256((__m256i*)r._, v);
   return r;
 }
@@ -211,16 +243,16 @@ PSIMD_INLINE psimd_f32x4 psimd_set1_f32x4(float x) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_set1_ps(x));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vdupq_n_f32(x));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t v = wasm_f32x4_splat(x);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float* p = (float*)r._;
   p[0] = p[1] = p[2] = p[3] = x;
   return r;
@@ -232,17 +264,17 @@ PSIMD_INLINE psimd_f32x4 psimd_set_f32x4(float x0, float x1, float x2,
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_set_ps(x3, x2, x1, x0));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float tmp[4] = {x0, x1, x2, x3};
   vst1q_f32((float*)r._, vld1q_f32(tmp));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t v = wasm_f32x4_make(x0, x1, x2, x3);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float* p = (float*)r._;
   p[0] = x0;
   p[1] = x1;
@@ -256,16 +288,16 @@ PSIMD_INLINE psimd_f32x4 psimd_zero_f32x4(void) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_setzero_ps());
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vdupq_n_f32(0.0f));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t v = wasm_f32x4_splat(0.0f);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
 #endif
@@ -275,16 +307,16 @@ PSIMD_INLINE psimd_f32x4 psimd_loadu_f32x4(const float* p) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_loadu_ps(p));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vld1q_f32(p));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t v = wasm_v128_load(p);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   memcpy(r._, p, 16);
   return r;
 #endif
@@ -294,16 +326,16 @@ PSIMD_INLINE psimd_f32x4 psimd_loada_f32x4(const float* p) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_load_ps(p));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vld1q_f32(p));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t v = wasm_v128_load(p);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   memcpy(r._, p, 16);
   return r;
 #endif
@@ -345,12 +377,12 @@ PSIMD_INLINE psimd_f32x4 psimd_add_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_add_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vaddq_f32(vld1q_f32((const float*)a._),
                                    vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -358,7 +390,7 @@ PSIMD_INLINE psimd_f32x4 psimd_add_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0] + pb[0];
@@ -373,12 +405,12 @@ PSIMD_INLINE psimd_f32x4 psimd_sub_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_sub_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vsubq_f32(vld1q_f32((const float*)a._),
                                    vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -386,7 +418,7 @@ PSIMD_INLINE psimd_f32x4 psimd_sub_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0] - pb[0];
@@ -401,12 +433,12 @@ PSIMD_INLINE psimd_f32x4 psimd_mul_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_mul_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vmulq_f32(vld1q_f32((const float*)a._),
                                    vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -414,7 +446,7 @@ PSIMD_INLINE psimd_f32x4 psimd_mul_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0] * pb[0];
@@ -429,7 +461,7 @@ PSIMD_INLINE psimd_f32x4 psimd_div_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_div_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4_t va = vld1q_f32((const float*)a._);
   float32x4_t vb = vld1q_f32((const float*)b._);
 #if defined(__aarch64__)
@@ -442,7 +474,7 @@ PSIMD_INLINE psimd_f32x4 psimd_div_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #endif
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -450,7 +482,7 @@ PSIMD_INLINE psimd_f32x4 psimd_div_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0] / pb[0];
@@ -465,18 +497,18 @@ PSIMD_INLINE psimd_f32x4 psimd_neg_f32x4(psimd_f32x4 a) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_xor_ps(psimd__to_m128(a), _mm_set1_ps(-0.0f)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vnegq_f32(vld1q_f32((const float*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_neg(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
   pr[0] = -pa[0];
@@ -493,18 +525,18 @@ PSIMD_INLINE psimd_f32x4 psimd_abs_f32x4(psimd_f32x4 a) {
   return psimd__from_m128(
       _mm_and_ps(psimd__to_m128(a), _mm_castsi128_ps(mask)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vabsq_f32(vld1q_f32((const float*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_abs(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
   pr[0] = fabsf(pa[0]);
@@ -519,7 +551,7 @@ PSIMD_INLINE psimd_f32x4 psimd_sqrt_f32x4(psimd_f32x4 a) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_sqrt_ps(psimd__to_m128(a)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4_t va = vld1q_f32((const float*)a._);
 #if defined(__aarch64__)
   vst1q_f32((float*)r._, vsqrtq_f32(va));
@@ -531,14 +563,14 @@ PSIMD_INLINE psimd_f32x4 psimd_sqrt_f32x4(psimd_f32x4 a) {
 #endif
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_sqrt(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
   pr[0] = sqrtf(pa[0]);
@@ -553,14 +585,14 @@ PSIMD_INLINE psimd_f32x4 psimd_rsqrt_f32x4(psimd_f32x4 a) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_rsqrt_ps(psimd__to_m128(a)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4_t va = vld1q_f32((const float*)a._);
   float32x4_t est = vrsqrteq_f32(va);
   est = vmulq_f32(vrsqrtsq_f32(vmulq_f32(va, est), est), est);
   vst1q_f32((float*)r._, est);
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
   pr[0] = 1.0f / sqrtf(pa[0]);
@@ -569,7 +601,7 @@ PSIMD_INLINE psimd_f32x4 psimd_rsqrt_f32x4(psimd_f32x4 a) {
   pr[3] = 1.0f / sqrtf(pa[3]);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
   pr[0] = 1.0f / sqrtf(pa[0]);
@@ -588,12 +620,12 @@ PSIMD_INLINE psimd_f32x4 psimd_min_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_min_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vminq_f32(vld1q_f32((const float*)a._),
                                    vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -601,7 +633,7 @@ PSIMD_INLINE psimd_f32x4 psimd_min_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0] < pb[0] ? pa[0] : pb[0];
@@ -616,12 +648,12 @@ PSIMD_INLINE psimd_f32x4 psimd_max_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_max_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vmaxq_f32(vld1q_f32((const float*)a._),
                                    vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -629,7 +661,7 @@ PSIMD_INLINE psimd_f32x4 psimd_max_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0] > pb[0] ? pa[0] : pb[0];
@@ -646,21 +678,21 @@ PSIMD_INLINE psimd_f32x4 psimd_max_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
 
 PSIMD_INLINE psimd_f32x4 psimd_fma_f32x4(psimd_f32x4 a, psimd_f32x4 b,
                                          psimd_f32x4 c) {
-#if defined(PSIMD_FMA) || defined(PSIMD_AVX)
+#if defined(PSIMD_FMA)
   return psimd__from_m128(
       _mm_fmadd_ps(psimd__to_m128(a), psimd__to_m128(b), psimd__to_m128(c)));
-#elif defined(PSIMD_SSE2)
+#elif defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_add_ps(
       _mm_mul_ps(psimd__to_m128(a), psimd__to_m128(b)), psimd__to_m128(c)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4_t va = vld1q_f32((const float*)a._);
   float32x4_t vb = vld1q_f32((const float*)b._);
   float32x4_t vc = vld1q_f32((const float*)c._);
   vst1q_f32((float*)r._, vmlaq_f32(vc, va, vb));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vc, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -669,7 +701,7 @@ PSIMD_INLINE psimd_f32x4 psimd_fma_f32x4(psimd_f32x4 a, psimd_f32x4 b,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._,
               *pc = (const float*)c._;
   float* pr = (float*)r._;
@@ -683,21 +715,21 @@ PSIMD_INLINE psimd_f32x4 psimd_fma_f32x4(psimd_f32x4 a, psimd_f32x4 b,
 
 PSIMD_INLINE psimd_f32x4 psimd_fnma_f32x4(psimd_f32x4 a, psimd_f32x4 b,
                                           psimd_f32x4 c) {
-#if defined(PSIMD_FMA) || defined(PSIMD_AVX)
+#if defined(PSIMD_FMA)
   return psimd__from_m128(
       _mm_fnmadd_ps(psimd__to_m128(a), psimd__to_m128(b), psimd__to_m128(c)));
-#elif defined(PSIMD_SSE2)
+#elif defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_sub_ps(
       psimd__to_m128(c), _mm_mul_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4_t va = vld1q_f32((const float*)a._);
   float32x4_t vb = vld1q_f32((const float*)b._);
   float32x4_t vc = vld1q_f32((const float*)c._);
   vst1q_f32((float*)r._, vmlsq_f32(vc, va, vb));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va, vb, vc, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -706,7 +738,7 @@ PSIMD_INLINE psimd_f32x4 psimd_fnma_f32x4(psimd_f32x4 a, psimd_f32x4 b,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._,
               *pc = (const float*)c._;
   float* pr = (float*)r._;
@@ -727,12 +759,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128i_mask(
       _mm_castps_si128(_mm_cmpeq_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vceqq_f32(vld1q_f32((const float*)a._),
                                       vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -740,7 +772,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] == pb[0] ? 0xffffffff : 0;
@@ -756,12 +788,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpne_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128i_mask(
       _mm_castps_si128(_mm_cmpneq_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vmvnq_u32(vceqq_f32(vld1q_f32((const float*)a._),
                                                 vld1q_f32((const float*)b._))));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -769,7 +801,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpne_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] != pb[0] ? 0xffffffff : 0;
@@ -785,12 +817,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmplt_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128i_mask(
       _mm_castps_si128(_mm_cmplt_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vcltq_f32(vld1q_f32((const float*)a._),
                                       vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -798,7 +830,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmplt_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] < pb[0] ? 0xffffffff : 0;
@@ -814,12 +846,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmple_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128i_mask(
       _mm_castps_si128(_mm_cmple_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vcleq_f32(vld1q_f32((const float*)a._),
                                       vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -827,7 +859,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmple_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] <= pb[0] ? 0xffffffff : 0;
@@ -843,12 +875,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpgt_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128i_mask(
       _mm_castps_si128(_mm_cmpgt_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vcgtq_f32(vld1q_f32((const float*)a._),
                                       vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -856,7 +888,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpgt_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] > pb[0] ? 0xffffffff : 0;
@@ -872,12 +904,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpge_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128i_mask(
       _mm_castps_si128(_mm_cmpge_ps(psimd__to_m128(a), psimd__to_m128(b))));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vcgeq_f32(vld1q_f32((const float*)a._),
                                       vld1q_f32((const float*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -885,7 +917,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpge_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] >= pb[0] ? 0xffffffff : 0;
@@ -913,14 +945,14 @@ PSIMD_INLINE psimd_f32x4 psimd_select_f32x4(psimd_mask32x4 m, psimd_f32x4 a,
   __m128i r = _mm_or_si128(_mm_and_si128(mi, ia), _mm_andnot_si128(mi, ib));
   return psimd__from_m128(_mm_castsi128_ps(r));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   uint32x4_t vm = vld1q_u32((const uint32_t*)m._);
   float32x4_t va = vld1q_f32((const float*)a._);
   float32x4_t vb = vld1q_f32((const float*)b._);
   vst1q_f32((float*)r._, vbslq_f32(vm, va, vb));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t vm, va, vb, vr;
   memcpy(&vm, m._, 16);
   memcpy(&va, a._, 16);
@@ -929,7 +961,7 @@ PSIMD_INLINE psimd_f32x4 psimd_select_f32x4(psimd_mask32x4 m, psimd_f32x4 a,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const uint32_t* pm = (const uint32_t*)m._;
   const uint32_t* pa = (const uint32_t*)a._;
   const uint32_t* pb = (const uint32_t*)b._;
@@ -1050,12 +1082,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_and_mask32x4(psimd_mask32x4 a,
   return psimd__from_m128i_mask(
       _mm_and_si128(psimd__mask_to_m128i(a), psimd__mask_to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vandq_u32(vld1q_u32((const uint32_t*)a._),
                                       vld1q_u32((const uint32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1063,7 +1095,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_and_mask32x4(psimd_mask32x4 a,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const uint32_t *pa = (const uint32_t*)a._, *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] & pb[0];
@@ -1080,12 +1112,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_or_mask32x4(psimd_mask32x4 a,
   return psimd__from_m128i_mask(
       _mm_or_si128(psimd__mask_to_m128i(a), psimd__mask_to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vorrq_u32(vld1q_u32((const uint32_t*)a._),
                                       vld1q_u32((const uint32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1093,7 +1125,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_or_mask32x4(psimd_mask32x4 a,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const uint32_t *pa = (const uint32_t*)a._, *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] | pb[0];
@@ -1109,18 +1141,18 @@ PSIMD_INLINE psimd_mask32x4 psimd_not_mask32x4(psimd_mask32x4 a) {
   __m128i ones = _mm_set1_epi32(-1);
   return psimd__from_m128i_mask(_mm_xor_si128(psimd__mask_to_m128i(a), ones));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vmvnq_u32(vld1q_u32((const uint32_t*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_v128_not(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const uint32_t* pa = (const uint32_t*)a._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = ~pa[0];
@@ -1137,12 +1169,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_xor_mask32x4(psimd_mask32x4 a,
   return psimd__from_m128i_mask(
       _mm_xor_si128(psimd__mask_to_m128i(a), psimd__mask_to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, veorq_u32(vld1q_u32((const uint32_t*)a._),
                                       vld1q_u32((const uint32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1150,7 +1182,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_xor_mask32x4(psimd_mask32x4 a,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const uint32_t *pa = (const uint32_t*)a._, *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] ^ pb[0];
@@ -1188,13 +1220,13 @@ PSIMD_INLINE int psimd_all_mask32x4(psimd_mask32x4 m) {
 }
 
 PSIMD_INLINE psimd_mask32x4 psimd_true_mask32x4(void) {
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   memset(r._, 0xff, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_mask32x4 psimd_false_mask32x4(void) {
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
 }
@@ -1207,16 +1239,16 @@ PSIMD_INLINE psimd_i32x4 psimd_set1_i32x4(int32_t x) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_set1_epi32(x));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vdupq_n_s32(x));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t v = wasm_i32x4_splat(x);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   int32_t* p = (int32_t*)r._;
   p[0] = p[1] = p[2] = p[3] = x;
   return r;
@@ -1228,17 +1260,17 @@ PSIMD_INLINE psimd_i32x4 psimd_set_i32x4(int32_t x0, int32_t x1, int32_t x2,
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_set_epi32(x3, x2, x1, x0));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   int32_t tmp[4] = {x0, x1, x2, x3};
   vst1q_s32((int32_t*)r._, vld1q_s32(tmp));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t v = wasm_i32x4_make(x0, x1, x2, x3);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   int32_t* p = (int32_t*)r._;
   p[0] = x0;
   p[1] = x1;
@@ -1249,7 +1281,7 @@ PSIMD_INLINE psimd_i32x4 psimd_set_i32x4(int32_t x0, int32_t x1, int32_t x2,
 }
 
 PSIMD_INLINE psimd_i32x4 psimd_zero_i32x4(void) {
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memset(r._, 0, 16);
   return r;
 }
@@ -1258,16 +1290,16 @@ PSIMD_INLINE psimd_i32x4 psimd_loadu_i32x4(const int32_t* p) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_loadu_si128((const __m128i*)p));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vld1q_s32(p));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t v = wasm_v128_load(p);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memcpy(r._, p, 16);
   return r;
 #endif
@@ -1277,16 +1309,16 @@ PSIMD_INLINE psimd_i32x4 psimd_loada_i32x4(const int32_t* p) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_load_si128((const __m128i*)p));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vld1q_s32(p));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t v = wasm_v128_load(p);
   memcpy(r._, &v, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memcpy(r._, p, 16);
   return r;
 #endif
@@ -1329,12 +1361,12 @@ PSIMD_INLINE psimd_i32x4 psimd_add_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_add_epi32(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vaddq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1342,13 +1374,15 @@ PSIMD_INLINE psimd_i32x4 psimd_add_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
-  const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
-  int32_t* pr = (int32_t*)r._;
+  psimd_i32x4 r = {{0}};
+  uint32_t pa[4], pb[4], pr[4];
+  memcpy(pa, a._, 16);
+  memcpy(pb, b._, 16);
   pr[0] = pa[0] + pb[0];
   pr[1] = pa[1] + pb[1];
   pr[2] = pa[2] + pb[2];
   pr[3] = pa[3] + pb[3];
+  memcpy(r._, pr, 16);
   return r;
 #endif
 }
@@ -1358,12 +1392,12 @@ PSIMD_INLINE psimd_i32x4 psimd_sub_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_sub_epi32(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vsubq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1371,13 +1405,15 @@ PSIMD_INLINE psimd_i32x4 psimd_sub_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
-  const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
-  int32_t* pr = (int32_t*)r._;
+  psimd_i32x4 r = {{0}};
+  uint32_t pa[4], pb[4], pr[4];
+  memcpy(pa, a._, 16);
+  memcpy(pb, b._, 16);
   pr[0] = pa[0] - pb[0];
   pr[1] = pa[1] - pb[1];
   pr[2] = pa[2] - pb[2];
   pr[3] = pa[3] - pb[3];
+  memcpy(r._, pr, 16);
   return r;
 #endif
 }
@@ -1394,12 +1430,12 @@ PSIMD_INLINE psimd_i32x4 psimd_mul_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
       _mm_unpacklo_epi32(_mm_shuffle_epi32(lo, _MM_SHUFFLE(0, 0, 2, 0)),
                          _mm_shuffle_epi32(hi, _MM_SHUFFLE(0, 0, 2, 0))));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vmulq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1407,13 +1443,15 @@ PSIMD_INLINE psimd_i32x4 psimd_mul_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
-  const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
-  int32_t* pr = (int32_t*)r._;
+  psimd_i32x4 r = {{0}};
+  uint32_t pa[4], pb[4], pr[4];
+  memcpy(pa, a._, 16);
+  memcpy(pb, b._, 16);
   pr[0] = pa[0] * pb[0];
   pr[1] = pa[1] * pb[1];
   pr[2] = pa[2] * pb[2];
   pr[3] = pa[3] * pb[3];
+  memcpy(r._, pr, 16);
   return r;
 #endif
 }
@@ -1423,24 +1461,25 @@ PSIMD_INLINE psimd_i32x4 psimd_neg_i32x4(psimd_i32x4 a) {
   return psimd__from_m128i(
       _mm_sub_epi32(_mm_setzero_si128(), psimd__to_m128i(a)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vnegq_s32(vld1q_s32((const int32_t*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_i32x4_neg(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
-  const int32_t* pa = (const int32_t*)a._;
-  int32_t* pr = (int32_t*)r._;
-  pr[0] = -pa[0];
-  pr[1] = -pa[1];
-  pr[2] = -pa[2];
-  pr[3] = -pa[3];
+  psimd_i32x4 r = {{0}};
+  uint32_t pa[4], pr[4];
+  memcpy(pa, a._, 16);
+  pr[0] = 0u - pa[0];
+  pr[1] = 0u - pa[1];
+  pr[2] = 0u - pa[2];
+  pr[3] = 0u - pa[3];
+  memcpy(r._, pr, 16);
   return r;
 #endif
 }
@@ -1455,24 +1494,27 @@ PSIMD_INLINE psimd_i32x4 psimd_abs_i32x4(psimd_i32x4 a) {
   return psimd__from_m128i(
       _mm_or_si128(_mm_and_si128(mask, neg), _mm_andnot_si128(mask, v)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vabsq_s32(vld1q_s32((const int32_t*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_i32x4_abs(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
-  const int32_t* pa = (const int32_t*)a._;
-  int32_t* pr = (int32_t*)r._;
-  pr[0] = pa[0] < 0 ? -pa[0] : pa[0];
-  pr[1] = pa[1] < 0 ? -pa[1] : pa[1];
-  pr[2] = pa[2] < 0 ? -pa[2] : pa[2];
-  pr[3] = pa[3] < 0 ? -pa[3] : pa[3];
+  psimd_i32x4 r = {{0}};
+  int32_t pa[4];
+  uint32_t pu[4], pr[4];
+  memcpy(pa, a._, 16);
+  memcpy(pu, a._, 16);
+  pr[0] = pa[0] < 0 ? 0u - pu[0] : pu[0];
+  pr[1] = pa[1] < 0 ? 0u - pu[1] : pu[1];
+  pr[2] = pa[2] < 0 ? 0u - pu[2] : pu[2];
+  pr[3] = pa[3] < 0 ? 0u - pu[3] : pu[3];
+  memcpy(r._, pr, 16);
   return r;
 #endif
 }
@@ -1487,12 +1529,12 @@ PSIMD_INLINE psimd_i32x4 psimd_min_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_or_si128(_mm_and_si128(mask, va), _mm_andnot_si128(mask, vb)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vminq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1500,7 +1542,7 @@ PSIMD_INLINE psimd_i32x4 psimd_min_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   int32_t* pr = (int32_t*)r._;
   pr[0] = pa[0] < pb[0] ? pa[0] : pb[0];
@@ -1521,12 +1563,12 @@ PSIMD_INLINE psimd_i32x4 psimd_max_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_or_si128(_mm_and_si128(mask, va), _mm_andnot_si128(mask, vb)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vmaxq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1534,7 +1576,7 @@ PSIMD_INLINE psimd_i32x4 psimd_max_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   int32_t* pr = (int32_t*)r._;
   pr[0] = pa[0] > pb[0] ? pa[0] : pb[0];
@@ -1554,12 +1596,12 @@ PSIMD_INLINE psimd_i32x4 psimd_and_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_and_si128(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vandq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1567,7 +1609,7 @@ PSIMD_INLINE psimd_i32x4 psimd_and_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t *pa = (const uint32_t*)a._, *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] & pb[0];
@@ -1583,12 +1625,12 @@ PSIMD_INLINE psimd_i32x4 psimd_or_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_or_si128(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vorrq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1596,7 +1638,7 @@ PSIMD_INLINE psimd_i32x4 psimd_or_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t *pa = (const uint32_t*)a._, *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] | pb[0];
@@ -1612,12 +1654,12 @@ PSIMD_INLINE psimd_i32x4 psimd_xor_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i(
       _mm_xor_si128(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, veorq_s32(vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1625,7 +1667,7 @@ PSIMD_INLINE psimd_i32x4 psimd_xor_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t *pa = (const uint32_t*)a._, *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] ^ pb[0];
@@ -1641,18 +1683,18 @@ PSIMD_INLINE psimd_i32x4 psimd_not_i32x4(psimd_i32x4 a) {
   return psimd__from_m128i(
       _mm_xor_si128(psimd__to_m128i(a), _mm_set1_epi32(-1)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vmvnq_s32(vld1q_s32((const int32_t*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_v128_not(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t* pa = (const uint32_t*)a._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = ~pa[0];
@@ -1667,19 +1709,19 @@ PSIMD_INLINE psimd_i32x4 psimd_shl_i32x4(psimd_i32x4 a, int n) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_slli_epi32(psimd__to_m128i(a), n));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._,
             vshlq_s32(vld1q_s32((const int32_t*)a._), vdupq_n_s32(n)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_i32x4_shl(va, n);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t* pa = (const uint32_t*)a._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] << n;
@@ -1694,19 +1736,19 @@ PSIMD_INLINE psimd_i32x4 psimd_shr_i32x4(psimd_i32x4 a, int n) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_srai_epi32(psimd__to_m128i(a), n));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._,
             vshlq_s32(vld1q_s32((const int32_t*)a._), vdupq_n_s32(-n)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_i32x4_shr(va, n);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const int32_t* pa = (const int32_t*)a._;
   int32_t* pr = (int32_t*)r._;
   pr[0] = pa[0] >> n;
@@ -1721,19 +1763,19 @@ PSIMD_INLINE psimd_i32x4 psimd_shru_i32x4(psimd_i32x4 a, int n) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_srli_epi32(psimd__to_m128i(a), n));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._,
             vshlq_u32(vld1q_u32((const uint32_t*)a._), vdupq_n_s32(-n)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_u32x4_shr(va, n);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t* pa = (const uint32_t*)a._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] >> n;
@@ -1753,12 +1795,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i_mask(
       _mm_cmpeq_epi32(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vceqq_s32(vld1q_s32((const int32_t*)a._),
                                       vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1766,7 +1808,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpeq_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] == pb[0] ? 0xffffffff : 0;
@@ -1782,12 +1824,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmplt_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i_mask(
       _mm_cmplt_epi32(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vcltq_s32(vld1q_s32((const int32_t*)a._),
                                       vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1795,7 +1837,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmplt_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] < pb[0] ? 0xffffffff : 0;
@@ -1811,12 +1853,12 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpgt_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   return psimd__from_m128i_mask(
       _mm_cmpgt_epi32(psimd__to_m128i(a), psimd__to_m128i(b)));
 #elif defined(PSIMD_NEON)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   vst1q_u32((uint32_t*)r._, vcgtq_s32(vld1q_s32((const int32_t*)a._),
                                       vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   v128_t va, vb, vr;
   memcpy(&va, a._, 16);
   memcpy(&vb, b._, 16);
@@ -1824,7 +1866,7 @@ PSIMD_INLINE psimd_mask32x4 psimd_cmpgt_i32x4(psimd_i32x4 a, psimd_i32x4 b) {
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   const int32_t *pa = (const int32_t*)a._, *pb = (const int32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
   pr[0] = pa[0] > pb[0] ? 0xffffffff : 0;
@@ -1846,13 +1888,13 @@ PSIMD_INLINE psimd_i32x4 psimd_select_i32x4(psimd_mask32x4 m, psimd_i32x4 a,
       _mm_or_si128(_mm_and_si128(mi, psimd__to_m128i(a)),
                    _mm_andnot_si128(mi, psimd__to_m128i(b))));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vbslq_s32(vld1q_u32((const uint32_t*)m._),
                                      vld1q_s32((const int32_t*)a._),
                                      vld1q_s32((const int32_t*)b._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t vm, va, vb, vr;
   memcpy(&vm, m._, 16);
   memcpy(&va, a._, 16);
@@ -1861,7 +1903,7 @@ PSIMD_INLINE psimd_i32x4 psimd_select_i32x4(psimd_mask32x4 m, psimd_i32x4 a,
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const uint32_t *pm = (const uint32_t*)m._, *pa = (const uint32_t*)a._,
                  *pb = (const uint32_t*)b._;
   uint32_t* pr = (uint32_t*)r._;
@@ -1878,8 +1920,9 @@ PSIMD_INLINE psimd_i32x4 psimd_select_i32x4(psimd_mask32x4 m, psimd_i32x4 a,
    ============================================================ */
 
 PSIMD_INLINE int32_t psimd_reduce_add_i32x4(psimd_i32x4 v) {
-  const int32_t* p = (const int32_t*)v._;
-  return p[0] + p[1] + p[2] + p[3];
+  uint32_t p[4];
+  memcpy(p, v._, 16);
+  return psimd__i32_from_u32(p[0] + p[1] + p[2] + p[3]);
 }
 
 PSIMD_INLINE int32_t psimd_reduce_max_i32x4(psimd_i32x4 v) {
@@ -1914,18 +1957,18 @@ PSIMD_INLINE psimd_i32x4 psimd_cvt_f32x4_i32x4(psimd_f32x4 a) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128i(_mm_cvttps_epi32(psimd__to_m128(a)));
 #elif defined(PSIMD_NEON)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   vst1q_s32((int32_t*)r._, vcvtq_s32_f32(vld1q_f32((const float*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_i32x4_trunc_sat_f32x4(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   const float* pa = (const float*)a._;
   int32_t* pr = (int32_t*)r._;
   pr[0] = (int32_t)pa[0];
@@ -1940,18 +1983,18 @@ PSIMD_INLINE psimd_f32x4 psimd_cvt_i32x4_f32x4(psimd_i32x4 a) {
 #if defined(PSIMD_SSE2) || defined(PSIMD_AVX)
   return psimd__from_m128(_mm_cvtepi32_ps(psimd__to_m128i(a)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   vst1q_f32((float*)r._, vcvtq_f32_s32(vld1q_s32((const int32_t*)a._)));
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_convert_i32x4(va);
   memcpy(r._, &vr, 16);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const int32_t* pa = (const int32_t*)a._;
   float* pr = (float*)r._;
   pr[0] = (float)pa[0];
@@ -1963,25 +2006,25 @@ PSIMD_INLINE psimd_f32x4 psimd_cvt_i32x4_f32x4(psimd_i32x4 a) {
 }
 
 PSIMD_INLINE psimd_f32x4 psimd_reinterpret_i32x4_f32x4(psimd_i32x4 a) {
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   memcpy(r._, a._, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_i32x4 psimd_reinterpret_f32x4_i32x4(psimd_f32x4 a) {
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memcpy(r._, a._, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_mask32x4 psimd_reinterpret_i32x4_mask32x4(psimd_i32x4 a) {
-  psimd_mask32x4 r;
+  psimd_mask32x4 r = {{0}};
   memcpy(r._, a._, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_i32x4 psimd_reinterpret_mask32x4_i32x4(psimd_mask32x4 a) {
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memcpy(r._, a._, 16);
   return r;
 }
@@ -1992,7 +2035,7 @@ PSIMD_INLINE psimd_i32x4 psimd_reinterpret_mask32x4_i32x4(psimd_mask32x4 a) {
 
 PSIMD_INLINE psimd_f32x4 psimd_shuffle_f32x4(psimd_f32x4 a, psimd_f32x4 b,
                                              int i0, int i1, int i2, int i3) {
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   const float* src[8] = {pa, pa, pa, pa, pb, pb, pb, pb};
@@ -2008,13 +2051,13 @@ PSIMD_INLINE psimd_f32x4 psimd_zip_lo_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128(
       _mm_unpacklo_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4x2_t zipped =
       vzipq_f32(vld1q_f32((const float*)a._), vld1q_f32((const float*)b._));
   vst1q_f32((float*)r._, zipped.val[0]);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[0];
@@ -2030,13 +2073,13 @@ PSIMD_INLINE psimd_f32x4 psimd_zip_hi_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
   return psimd__from_m128(
       _mm_unpackhi_ps(psimd__to_m128(a), psimd__to_m128(b)));
 #elif defined(PSIMD_NEON)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   float32x4x2_t zipped =
       vzipq_f32(vld1q_f32((const float*)a._), vld1q_f32((const float*)b._));
   vst1q_f32((float*)r._, zipped.val[1]);
   return r;
 #else
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   const float *pa = (const float*)a._, *pb = (const float*)b._;
   float* pr = (float*)r._;
   pr[0] = pa[2];
@@ -2055,7 +2098,7 @@ PSIMD_INLINE psimd_f32x8 psimd_set1_f32x8(float x) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_set1_ps(x));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 lo = psimd_set1_f32x4(x);
   memcpy(r._, lo._, 16);
   memcpy(r._ + 16, lo._, 16);
@@ -2067,7 +2110,7 @@ PSIMD_INLINE psimd_f32x8 psimd_loadu_f32x8(const float* p) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_loadu_ps(p));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 lo = psimd_loadu_f32x4(p);
   psimd_f32x4 hi = psimd_loadu_f32x4(p + 4);
   memcpy(r._, lo._, 16);
@@ -2080,7 +2123,7 @@ PSIMD_INLINE psimd_f32x8 psimd_loada_f32x8(const float* p) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_load_ps(p));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 lo = psimd_loada_f32x4(p);
   psimd_f32x4 hi = psimd_loada_f32x4(p + 4);
   memcpy(r._, lo._, 16);
@@ -2117,7 +2160,7 @@ PSIMD_INLINE psimd_f32x8 psimd_add_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_add_ps(psimd__to_m256(a), psimd__to_m256(b)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2135,7 +2178,7 @@ PSIMD_INLINE psimd_f32x8 psimd_sub_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_sub_ps(psimd__to_m256(a), psimd__to_m256(b)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2153,7 +2196,7 @@ PSIMD_INLINE psimd_f32x8 psimd_mul_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_mul_ps(psimd__to_m256(a), psimd__to_m256(b)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2171,7 +2214,7 @@ PSIMD_INLINE psimd_f32x8 psimd_div_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_div_ps(psimd__to_m256(a), psimd__to_m256(b)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2187,11 +2230,11 @@ PSIMD_INLINE psimd_f32x8 psimd_div_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 
 PSIMD_INLINE psimd_f32x8 psimd_fma_f32x8(psimd_f32x8 a, psimd_f32x8 b,
                                          psimd_f32x8 c) {
-#if defined(PSIMD_AVX)
+#if defined(PSIMD_AVX) && defined(PSIMD_FMA)
   return psimd__from_m256(
       _mm256_fmadd_ps(psimd__to_m256(a), psimd__to_m256(b), psimd__to_m256(c)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi, clo, chi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2211,7 +2254,7 @@ PSIMD_INLINE psimd_f32x8 psimd_min_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_min_ps(psimd__to_m256(a), psimd__to_m256(b)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2229,7 +2272,7 @@ PSIMD_INLINE psimd_f32x8 psimd_max_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256(_mm256_max_ps(psimd__to_m256(a), psimd__to_m256(b)));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2248,7 +2291,7 @@ PSIMD_INLINE psimd_mask32x8 psimd_cmplt_f32x8(psimd_f32x8 a, psimd_f32x8 b) {
   return psimd__from_m256i_mask(_mm256_castps_si256(
       _mm256_cmp_ps(psimd__to_m256(a), psimd__to_m256(b), _CMP_LT_OQ)));
 #else
-  psimd_mask32x8 r;
+  psimd_mask32x8 r = {{0}};
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2269,7 +2312,7 @@ PSIMD_INLINE psimd_f32x8 psimd_select_f32x8(psimd_mask32x8 m, psimd_f32x8 a,
   return psimd__from_m256(
       _mm256_blendv_ps(psimd__to_m256(b), psimd__to_m256(a), mf));
 #else
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   psimd_mask32x4 mlo, mhi;
   psimd_f32x4 alo, ahi, blo, bhi;
   memcpy(mlo._, m._, 16);
@@ -2308,19 +2351,19 @@ PSIMD_INLINE float psimd_reduce_min_f32x8(psimd_f32x8 v) {
 }
 
 PSIMD_INLINE psimd_f32x4 psimd_lo_f32x8(psimd_f32x8 v) {
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   memcpy(r._, v._, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_f32x4 psimd_hi_f32x8(psimd_f32x8 v) {
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   memcpy(r._, v._ + 16, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_f32x8 psimd_combine_f32x8(psimd_f32x4 lo, psimd_f32x4 hi) {
-  psimd_f32x8 r;
+  psimd_f32x8 r = {{0}};
   memcpy(r._, lo._, 16);
   memcpy(r._ + 16, hi._, 16);
   return r;
@@ -2334,7 +2377,7 @@ PSIMD_INLINE psimd_i32x8 psimd_set1_i32x8(int32_t x) {
 #if defined(PSIMD_AVX)
   return psimd__from_m256i(_mm256_set1_epi32(x));
 #else
-  psimd_i32x8 r;
+  psimd_i32x8 r = {{0}};
   psimd_i32x4 lo = psimd_set1_i32x4(x);
   memcpy(r._, lo._, 16);
   memcpy(r._ + 16, lo._, 16);
@@ -2343,11 +2386,11 @@ PSIMD_INLINE psimd_i32x8 psimd_set1_i32x8(int32_t x) {
 }
 
 PSIMD_INLINE psimd_i32x8 psimd_add_i32x8(psimd_i32x8 a, psimd_i32x8 b) {
-#if defined(PSIMD_AVX)
+#if defined(PSIMD_AVX2)
   return psimd__from_m256i(
       _mm256_add_epi32(psimd__to_m256i(a), psimd__to_m256i(b)));
 #else
-  psimd_i32x8 r;
+  psimd_i32x8 r = {{0}};
   psimd_i32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2362,11 +2405,11 @@ PSIMD_INLINE psimd_i32x8 psimd_add_i32x8(psimd_i32x8 a, psimd_i32x8 b) {
 }
 
 PSIMD_INLINE psimd_i32x8 psimd_sub_i32x8(psimd_i32x8 a, psimd_i32x8 b) {
-#if defined(PSIMD_AVX)
+#if defined(PSIMD_AVX2)
   return psimd__from_m256i(
       _mm256_sub_epi32(psimd__to_m256i(a), psimd__to_m256i(b)));
 #else
-  psimd_i32x8 r;
+  psimd_i32x8 r = {{0}};
   psimd_i32x4 alo, ahi, blo, bhi;
   memcpy(alo._, a._, 16);
   memcpy(ahi._, a._ + 16, 16);
@@ -2381,19 +2424,19 @@ PSIMD_INLINE psimd_i32x8 psimd_sub_i32x8(psimd_i32x8 a, psimd_i32x8 b) {
 }
 
 PSIMD_INLINE psimd_i32x4 psimd_lo_i32x8(psimd_i32x8 v) {
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memcpy(r._, v._, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_i32x4 psimd_hi_i32x8(psimd_i32x8 v) {
-  psimd_i32x4 r;
+  psimd_i32x4 r = {{0}};
   memcpy(r._, v._ + 16, 16);
   return r;
 }
 
 PSIMD_INLINE psimd_i32x8 psimd_combine_i32x8(psimd_i32x4 lo, psimd_i32x4 hi) {
-  psimd_i32x8 r;
+  psimd_i32x8 r = {{0}};
   memcpy(r._, lo._, 16);
   memcpy(r._ + 16, hi._, 16);
   return r;
@@ -2420,7 +2463,7 @@ PSIMD_INLINE psimd_f32x4 psimd_floor_f32x4(psimd_f32x4 a) {
 #endif
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_floor(va);
@@ -2455,7 +2498,7 @@ PSIMD_INLINE psimd_f32x4 psimd_ceil_f32x4(psimd_f32x4 a) {
 #endif
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_ceil(va);
@@ -2480,18 +2523,18 @@ PSIMD_INLINE psimd_f32x4 psimd_round_f32x4(psimd_f32x4 a) {
 #elif defined(PSIMD_NEON)
   psimd_f32x4 r = psimd_zero_f32x4();
 #if defined(__aarch64__)
-  vst1q_f32((float*)r._, vrndaq_f32(vld1q_f32((const float*)a._)));
+  vst1q_f32((float*)r._, vrndnq_f32(vld1q_f32((const float*)a._)));
 #else
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
-  pr[0] = roundf(pa[0]);
-  pr[1] = roundf(pa[1]);
-  pr[2] = roundf(pa[2]);
-  pr[3] = roundf(pa[3]);
+  pr[0] = psimd__round_nearest_even_f32(pa[0]);
+  pr[1] = psimd__round_nearest_even_f32(pa[1]);
+  pr[2] = psimd__round_nearest_even_f32(pa[2]);
+  pr[3] = psimd__round_nearest_even_f32(pa[3]);
 #endif
   return r;
 #elif defined(PSIMD_WASM)
-  psimd_f32x4 r;
+  psimd_f32x4 r = {{0}};
   v128_t va;
   memcpy(&va, a._, 16);
   v128_t vr = wasm_f32x4_nearest(va);
@@ -2501,10 +2544,10 @@ PSIMD_INLINE psimd_f32x4 psimd_round_f32x4(psimd_f32x4 a) {
   psimd_f32x4 r = psimd_zero_f32x4();
   const float* pa = (const float*)a._;
   float* pr = (float*)r._;
-  pr[0] = roundf(pa[0]);
-  pr[1] = roundf(pa[1]);
-  pr[2] = roundf(pa[2]);
-  pr[3] = roundf(pa[3]);
+  pr[0] = psimd__round_nearest_even_f32(pa[0]);
+  pr[1] = psimd__round_nearest_even_f32(pa[1]);
+  pr[2] = psimd__round_nearest_even_f32(pa[2]);
+  pr[3] = psimd__round_nearest_even_f32(pa[3]);
   return r;
 #endif
 }
@@ -2532,7 +2575,7 @@ PSIMD_INLINE psimd_f32x4 psimd_hadd_f32x4(psimd_f32x4 a, psimd_f32x4 b) {
    ============================================================ */
 
 PSIMD_INLINE psimd_u32x4 psimd_set1_u32x4(uint32_t x) {
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memset(r._, 0, 16);
   uint32_t* p = (uint32_t*)r._;
   p[0] = p[1] = p[2] = p[3] = x;
@@ -2541,7 +2584,7 @@ PSIMD_INLINE psimd_u32x4 psimd_set1_u32x4(uint32_t x) {
 
 PSIMD_INLINE psimd_u32x4 psimd_set_u32x4(uint32_t x0, uint32_t x1, uint32_t x2,
                                          uint32_t x3) {
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memset(r._, 0, 16);
   uint32_t* p = (uint32_t*)r._;
   p[0] = x0;
@@ -2552,7 +2595,7 @@ PSIMD_INLINE psimd_u32x4 psimd_set_u32x4(uint32_t x0, uint32_t x1, uint32_t x2,
 }
 
 PSIMD_INLINE psimd_u32x4 psimd_loadu_u32x4(const uint32_t* p) {
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, p, 16);
   return r;
 }
@@ -2566,7 +2609,7 @@ PSIMD_INLINE psimd_u32x4 psimd_add_u32x4(psimd_u32x4 a, psimd_u32x4 b) {
   memcpy(ia._, a._, 16);
   memcpy(ib._, b._, 16);
   psimd_i32x4 ir = psimd_add_i32x4(ia, ib);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }
@@ -2576,7 +2619,7 @@ PSIMD_INLINE psimd_u32x4 psimd_sub_u32x4(psimd_u32x4 a, psimd_u32x4 b) {
   memcpy(ia._, a._, 16);
   memcpy(ib._, b._, 16);
   psimd_i32x4 ir = psimd_sub_i32x4(ia, ib);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }
@@ -2586,7 +2629,7 @@ PSIMD_INLINE psimd_u32x4 psimd_and_u32x4(psimd_u32x4 a, psimd_u32x4 b) {
   memcpy(ia._, a._, 16);
   memcpy(ib._, b._, 16);
   psimd_i32x4 ir = psimd_and_i32x4(ia, ib);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }
@@ -2596,7 +2639,7 @@ PSIMD_INLINE psimd_u32x4 psimd_or_u32x4(psimd_u32x4 a, psimd_u32x4 b) {
   memcpy(ia._, a._, 16);
   memcpy(ib._, b._, 16);
   psimd_i32x4 ir = psimd_or_i32x4(ia, ib);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }
@@ -2606,7 +2649,7 @@ PSIMD_INLINE psimd_u32x4 psimd_xor_u32x4(psimd_u32x4 a, psimd_u32x4 b) {
   memcpy(ia._, a._, 16);
   memcpy(ib._, b._, 16);
   psimd_i32x4 ir = psimd_xor_i32x4(ia, ib);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }
@@ -2615,7 +2658,7 @@ PSIMD_INLINE psimd_u32x4 psimd_shl_u32x4(psimd_u32x4 a, int n) {
   psimd_i32x4 ia;
   memcpy(ia._, a._, 16);
   psimd_i32x4 ir = psimd_shl_i32x4(ia, n);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }
@@ -2624,7 +2667,7 @@ PSIMD_INLINE psimd_u32x4 psimd_shr_u32x4(psimd_u32x4 a, int n) {
   psimd_i32x4 ia;
   memcpy(ia._, a._, 16);
   psimd_i32x4 ir = psimd_shru_i32x4(ia, n);
-  psimd_u32x4 r;
+  psimd_u32x4 r = {{0}};
   memcpy(r._, ir._, 16);
   return r;
 }

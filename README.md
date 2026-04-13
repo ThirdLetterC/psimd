@@ -18,8 +18,8 @@ The backend is chosen by passing the appropriate architecture flag to the compil
 #### x86
 
 ```sh
-# Scalar fallback (no flags needed, always works)
-gcc -O2 -std=c99 your_file.c -lm
+# Force scalar fallback
+gcc -O2 -DPSIMD_FORCE_SCALAR -std=c99 your_file.c -lm
 
 # SSE2
 gcc -O2 -msse2 -std=c99 your_file.c -lm
@@ -67,7 +67,7 @@ psimd_backend b = psimd_get_backend();
 
 ```sh
 # Scalar
-gcc -O2 -std=c99 test.c -lm -o test && ./test
+gcc -O2 -DPSIMD_FORCE_SCALAR -std=c99 test.c -lm -o test && ./test
 
 # SSE4.1
 gcc -O2 -msse4.1 -std=c99 test.c -lm -o test && ./test
@@ -76,7 +76,7 @@ gcc -O2 -msse4.1 -std=c99 test.c -lm -o test && ./test
 gcc -O2 -mavx2 -mfma -std=c99 test.c -lm -o test && ./test
 ```
 
-The suite runs 107 checks covering construction, arithmetic, comparisons, masks, select, reductions, type conversions, shuffles and several practical kernels.
+The suite runs 114 checks covering construction, arithmetic, comparisons, masks, select, reductions, type conversions, shuffles and several practical kernels.
 
 ### Types
 
@@ -141,10 +141,10 @@ psimd_f32x4 psimd_fnma_f32x4(psimd_f32x4 a, psimd_f32x4 b, psimd_f32x4 c);  // -
 ```c
 psimd_f32x4 psimd_floor_f32x4(psimd_f32x4 a);
 psimd_f32x4 psimd_ceil_f32x4(psimd_f32x4 a);
-psimd_f32x4 psimd_round_f32x4(psimd_f32x4 a);   // nearest, ties to even on SSE4.1+
+psimd_f32x4 psimd_round_f32x4(psimd_f32x4 a);   // nearest, ties to even
 ```
 
-On SSE2 (without SSE4.1), `floor`, `ceil` and `round` fall back to scalar `floorf`/`ceilf`/`roundf`.
+On SSE2 (without SSE4.1), `floor` and `ceil` fall back to scalar `floorf`/`ceilf`. `round` preserves nearest-even tie handling across backends.
 
 #### f32x4 comparisons
 

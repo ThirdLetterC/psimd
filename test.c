@@ -1,5 +1,6 @@
 #include "psimd.h"
 
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
@@ -255,6 +256,12 @@ static void test_f32x4_math(void) {
   CHECK(rout[0] == 0.0f && rout[1] == 1.0f && rout[2] == 3.0f &&
             rout[3] == -1.0f,
         "round (unambiguous cases)");
+
+  psimd_f32x4 ties = psimd_set_f32x4(0.5f, 1.5f, 2.5f, -1.5f);
+  psimd_storeu_f32x4(rout, psimd_round_f32x4(ties));
+  CHECK(rout[0] == 0.0f && rout[1] == 2.0f && rout[2] == 2.0f &&
+            rout[3] == -2.0f,
+        "round ties to even");
 }
 
 /* ================================================================
@@ -334,6 +341,24 @@ static void test_i32x4_arithmetic(void) {
         "min");
   CHECK(i32x4_eq(psimd_max_i32x4(a, psimd_set1_i32x4(25)), 25, 25, 30, 40),
         "max");
+  CHECK(i32x4_eq(
+            psimd_add_i32x4(psimd_set1_i32x4(INT32_MAX), psimd_set1_i32x4(1)),
+            INT32_MIN, INT32_MIN, INT32_MIN, INT32_MIN),
+        "add wraps");
+  CHECK(i32x4_eq(
+            psimd_sub_i32x4(psimd_set1_i32x4(INT32_MIN), psimd_set1_i32x4(1)),
+            INT32_MAX, INT32_MAX, INT32_MAX, INT32_MAX),
+        "sub wraps");
+  CHECK(i32x4_eq(
+            psimd_mul_i32x4(psimd_set1_i32x4(INT32_MIN), psimd_set1_i32x4(-1)),
+            INT32_MIN, INT32_MIN, INT32_MIN, INT32_MIN),
+        "mul wraps");
+  CHECK(i32x4_eq(psimd_neg_i32x4(psimd_set1_i32x4(INT32_MIN)), INT32_MIN,
+                 INT32_MIN, INT32_MIN, INT32_MIN),
+        "neg wraps");
+  CHECK(i32x4_eq(psimd_abs_i32x4(psimd_set1_i32x4(INT32_MIN)), INT32_MIN,
+                 INT32_MIN, INT32_MIN, INT32_MIN),
+        "abs INT32_MIN wraps");
 }
 
 /* ================================================================
@@ -399,6 +424,9 @@ static void test_i32x4_reductions(void) {
   CHECK(psimd_reduce_add_i32x4(v) == 10, "reduce_add");
   CHECK(psimd_reduce_max_i32x4(v) == 4, "reduce_max");
   CHECK(psimd_reduce_min_i32x4(v) == 1, "reduce_min");
+
+  psimd_i32x4 wrap = psimd_set_i32x4(INT32_MAX, 1, 1, 0);
+  CHECK(psimd_reduce_add_i32x4(wrap) == INT32_MIN + 1, "reduce_add wraps");
 }
 
 /* ================================================================
