@@ -1,8 +1,8 @@
 set shell := ["sh", "-cu"]
 
-cc := env_var_or_default("CC", "gcc")
-cflags := env_var_or_default("CFLAGS", "-O2 -std=c2x -Wall -Wextra -Wpedantic -Werror")
-sanitize_cflags := env_var_or_default("SANITIZE_CFLAGS", "-O1 -g -std=c2x -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined,leak -fno-omit-frame-pointer")
+cc := env_var_or_default("CC", "clang")
+cflags := env_var_or_default("CFLAGS", "-O2 -std=c23 -Wall -Wextra -Wpedantic -Werror")
+sanitize_cflags := env_var_or_default("SANITIZE_CFLAGS", "-O1 -g -std=c23 -Wall -Wextra -Wpedantic -Werror -fsanitize=address,undefined,leak -fno-omit-frame-pointer")
 ldflags := env_var_or_default("LDFLAGS", "-lm")
 sanitize_ldflags := env_var_or_default("SANITIZE_LDFLAGS", "-lm -fsanitize=address,undefined,leak")
 build_dir := "build"

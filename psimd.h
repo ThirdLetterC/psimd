@@ -19,6 +19,17 @@
 #include <string.h>
 #include <math.h>
 
+/*
+ * Clang 18 accepts -std=c23 and reports __STDC_VERSION__ 202311L, but it does
+ * not yet implement C23 constexpr in C mode. Keep the source intent explicit
+ * while allowing the Clang-backed build to compile.
+ */
+#if defined(__clang__)
+#define PSIMD_CONSTEXPR const
+#else
+#define PSIMD_CONSTEXPR constexpr
+#endif
+
 #if defined(PSIMD_FORCE_SCALAR)
 #define PSIMD_SCALAR 1
 #elif defined(__AVX2__) || defined(__AVX__)
@@ -55,11 +66,11 @@
 #define PSIMD_SCALAR 1
 #endif
 
-static constexpr int PSIMD_VERSION_MAJOR = 1;
-static constexpr int PSIMD_VERSION_MINOR = 0;
-static constexpr int PSIMD_VERSION_PATCH = 0;
+static PSIMD_CONSTEXPR int PSIMD_VERSION_MAJOR = 1;
+static PSIMD_CONSTEXPR int PSIMD_VERSION_MINOR = 0;
+static PSIMD_CONSTEXPR int PSIMD_VERSION_PATCH = 0;
 
-static constexpr uint32_t psimd__mask32_true_bits = UINT32_MAX;
+static PSIMD_CONSTEXPR uint32_t psimd__mask32_true_bits = UINT32_MAX;
 
 #if defined(_MSC_VER)
 #define PSIMD_INLINE __forceinline

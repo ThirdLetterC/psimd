@@ -8,8 +8,8 @@
 static int g_passed;
 static int g_failed;
 
-static constexpr float f32_epsilon = 1e-5f;
-static constexpr uint32_t mask32_true_bits = UINT32_MAX;
+static PSIMD_CONSTEXPR float f32_epsilon = 1e-5f;
+static PSIMD_CONSTEXPR uint32_t mask32_true_bits = UINT32_MAX;
 
 static void check(bool cond, const char* name) {
   if (cond) {
@@ -583,7 +583,7 @@ static void test_u32x4() {
 static void test_kernel_array_ops() {
   printf("\nkernel: array ops\n");
 
-  constexpr size_t n = 16;
+  PSIMD_CONSTEXPR size_t n = 16;
   alignas(16) float a[16], b[16], out[16];
   for (size_t i = 0; i < n; i++) {
     a[i] = (float)(i + 1);
@@ -618,7 +618,7 @@ static void test_kernel_array_ops() {
 static void test_kernel_relu() {
   printf("\nkernel: relu\n");
 
-  constexpr size_t n = 8;
+  PSIMD_CONSTEXPR size_t n = 8;
   float in[8] = {-3.0f, 1.0f, -0.5f, 2.0f, 0.0f, -1.0f, 4.0f, -2.0f};
   float out[8] = {0};
   psimd_f32x4 zero = psimd_zero_f32x4();
@@ -643,7 +643,7 @@ static void test_kernel_relu() {
 static void test_kernel_clamp() {
   printf("\nkernel: clamp\n");
 
-  constexpr size_t n = 8;
+  PSIMD_CONSTEXPR size_t n = 8;
   float in[8] = {-5.0f, 0.5f, 1.5f, 3.0f, -1.0f, 0.0f, 2.5f, 10.0f};
   float out[8] = {0};
   psimd_f32x4 lo = psimd_set1_f32x4(0.0f);
@@ -669,7 +669,7 @@ static void test_kernel_clamp() {
 static void test_kernel_dot() {
   printf("\nkernel: dot product\n");
 
-  constexpr size_t n = 16;
+  PSIMD_CONSTEXPR size_t n = 16;
   float a[16], b[16];
   float expected = 0.0f;
   for (size_t i = 0; i < n; i++) {
@@ -694,7 +694,7 @@ static void test_kernel_dot() {
 static void test_kernel_blend() {
   printf("\nkernel: conditional blend\n");
 
-  constexpr size_t n = 8;
+  PSIMD_CONSTEXPR size_t n = 8;
   float src[8] = {1.0f, -1.0f, 2.0f, -2.0f, 3.0f, -3.0f, 4.0f, -4.0f};
   float sign[8] = {0};
   psimd_f32x4 zero = psimd_zero_f32x4();
